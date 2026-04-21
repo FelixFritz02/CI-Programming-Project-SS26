@@ -1,0 +1,114 @@
+\documentclass[11pt, oneside, a4paper]{article}
+\setcounter{secnumdepth}{3}  
+\setcounter{tocdepth}{3}
+
+% Packages
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\usepackage[english]{babel}
+\usepackage{blindtext}
+\usepackage[margin=5pt,labelfont=bf,format=hang,font=small]{caption}
+\usepackage{csquotes}
+\usepackage{framed}
+\usepackage{geometry}
+\geometry{a4paper, top=1in, left=1in, right=1in, bottom=1in, headsep=10mm, footskip=20mm}
+\usepackage{mathtools}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage[hyphens]{url}
+\usepackage[
+  pdftitle={PDF Titel},
+  pdfauthor={PDF Autor},
+  pdfsubject={Art der Arbeit}
+]{hyperref}
+
+
+\usepackage{fancyhdr}
+% Entweder
+%\pagestyle{plain}
+% oder
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small Max Mustermann}
+\lhead{\small Paper Title}
+\cfoot{\small Page \thepage}
+% oder anders...
+
+% Literaturverzeichnis
+\usepackage[
+  backend=biber,
+  citestyle=apa,
+  style=apa,
+  sorting=nyt,
+  sortcites=true,
+  maxcitenames=2,
+  isbn=false]
+{biblatex}
+\addbibresource{mybib.bib}
+
+% Ablürzungsverzeichnis
+\usepackage{acro}
+
+\DeclareAcronym{kp}{
+  short=KP,
+  long=Knapsack Problem,
+}
+\DeclareAcronym{ip}{
+  short=IP,
+  long=Integer Programming,
+}
+\DeclareAcronym{tsp}{
+  short=TSP,
+  long=Traveling Salesman Problem,
+}
+
+\allowdisplaybreaks
+
+\begin{document}
+
+% Titelseite & Verzeichnisse
+\input{misc/titlepage.tex}
+% Argumente bei \maketitlepage anpassen
+\maketitlepage{Projektbericht}{Paper Title}{Max Mustermann, B.\ Sc.}{rhrkacnt}{123456}{WI-ET}{01.01.2020}
+
+\input{sections/abstract.tex}
+
+\pagenumbering{Roman}
+\tableofcontents
+% Verzeichnisse, optional; auch nach Inhalt möglich
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{section}{List of Abbreviations}
+\printacronyms[name=List of Abbreviations]
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{List of Figures}
+\listoffigures
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{List of Tables}
+\listoftables
+\clearpage
+%\listofalgorithms
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+
+% Inhalt
+
+\include{sections/introduction}
+\include{sections/knapsack}
+\include{sections/tsp}
+\include{sections/conclusion}
+
+
+\clearpage
+\printbibliography
+\addcontentsline{toc}{section}{References}
+
+\clearpage
+\input{misc/declaration.tex}
+\end{document}

@@ -1,0 +1,38 @@
+\section{The Knapsack Problem}
+\label{section:kp}
+In the \ac{kp} \parencite[refer to][]{martello_knapsack_1990}, we are given a set of items $\mathcal{I}=\{1, \dots, n\}$.
+Each item $i \in \mathcal{I}$ has a positive weight $w_i \in \mathbb{R^+}$ and value $v_i \in \mathbb{R^+}$.
+Moreover, it is assumed that the capacity of our knapsack is $C \in \mathbb{R^+}$.
+In the \ac{kp}, the objective is to pack items into our knapsack such that the cumulative value is maximized while respecting the capacity restriction.
+
+\subsection{Integer Programming Model}
+In order to model the problem, we introduce a binary variable $x_i \, \forall i \in \mathcal{I}$ that indicates if item $i$ is packed into our knapsack. 
+Using these variables, the \ac{kp} can be modeled through the following \ac{ip} model:
+\begin{alignat}{3}
+   & \max              & \quad \sum_{i=1}^n v_i x_i,  &         && \quad \label{obj}                               \\
+   & \text{subject to} & \quad \sum_{i = 1}^n w_i x_i & \leq C, && \quad \label{cnstr}                             \\
+   &                   & \quad x_i \in \{0,1\}        &         && \quad \forall i \in \mathcal{I}. \label{domain}
+\end{alignat}
+
+In this model, the objective is given by \eqref{obj} and asks that the total value of the selected items is maximized.
+Constraint \eqref{cnstr} guarantees that the capacity is respected.
+Finally, constraints \eqref{domain} restrict the domain of the variables to binary.
+
+\subsection{Computational Complexity}
+\blindtext
+\subsection{Dynamic Programming Approaches}
+\blindtext
+
+\begin{algorithm}[H]
+    \label{alg:algo1}
+  \DontPrintSemicolon
+  \tcc{This is a comment. This type of comment can span multiple lines. However, comments should only be used sparsely.}
+  \For{$i$ in range $(1, n)$}
+  {
+    Do something \tcp*{This is another comment.}
+  }
+  \caption{Example code}
+\end{algorithm}
+
+Algorithmus \ref{alg:algo1} ist so toll!
+

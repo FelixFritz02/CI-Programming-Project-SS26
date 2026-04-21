@@ -1,0 +1,39 @@
+\section{The Traveling Salesman Problem}
+\label{section:tsp}
+Assume that we are given a complete graph $\mathcal{G}(V,E)$ where $V$ is the set of vertices and $E$ is the set of edges.
+For each pair of vertices $i, j \in V, i \neq j$ the edge $(i,j) \in E$ is associated with a distance $d_{ij} \in \mathbb{R}^+$.
+In the \ac{tsp}, we are tasked with finding a \textit{tour} with minimal distance that visits every vertex exactly once and then returns to the point of origin, i.e., a \textit{hamiltonian cycle} with minimal weight (see Figure \ref{fig:figure1}).
+
+In fact, the \ac{tsp} is a well-known combinatorial optimization problem that has already been studied for a long time \parencite[see, e.g.,][]{lin1965computer,dantzig1954solution}.
+\textcite{dantzig1954solution} introduced a lot of stuff! Bla bla bla here is another parenthetical citation \parencite{lin1965computer}.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}%
+    [vertex/.style={circle,draw,fill=black,minimum width=1.5mm,inner sep=0mm}]
+    \newcommand\coce{0.5}% distance of triangle corners from triangle center
+    \newcommand\cece{1.8}% distance of triangle centers from each other
+    % \tri{name}{coords of triangle center}{rotation angle} draws a triangle
+    \newcommand\tri[3]%
+    {\node[vertex] (#11) at ($(#2)+({#3-150}:\coce)$) {}; % vertex 1
+      \node[vertex] (#12) at ($(#2)+({#3- 30}:\coce)$) {}; % vertex 2
+      \node[vertex] (#13) at ($(#2)+({#3+ 90}:\coce)$) {}; % vertex 3
+      %\draw (#11) -- (#12) -- (#13) -- (#11);
+    }
+    % Draw graph
+    \tri{C}{  0:  0  }{  0} % center triangle
+    \tri{T}{ 90:\cece}{180} % top triangle
+    \tri{L}{210:\cece}{300} % left triangle
+    \tri{R}{330:\cece}{ 60} % right triangle
+    %\draw (T2) -- (L1) (L2) -- (R1) (R2) -- (T1)
+    %      (C1) -- (L3) (C2) -- (R3) (C3) -- (T3);
+    % Draw Hamiltonian cycle
+    \draw[very thick]
+    (T3) -- (T1) -- (T2) --
+    (L1) -- (L3) -- (L2) --
+    (R1) -- (R2) -- (R3) --
+    (C2) -- (C1) -- (C3) -- (T3);
+  \end{tikzpicture}
+  \caption{A hamiltonian cycle on a graph $\mathcal{G}(V,E)$ that consists of $\vert V \vert = 12$ vertices.}
+  \label{fig:figure1}
+\end{figure}
