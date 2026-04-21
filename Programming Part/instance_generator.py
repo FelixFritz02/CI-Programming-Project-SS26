@@ -4,7 +4,7 @@
 import random
 import numpy as np
 
-def instance(T_d=10, K=5, lam=1):
+def instance_generator(T_d=10, K=5, lam=1):
 
     total_requests = []
     for _ in range(T_d):
