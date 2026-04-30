@@ -17,9 +17,9 @@ class DrauspInstanceData:
     capacity_vector: list[int]
     instance: list
 
-def get_instance_date(data_path: Union[str, Path]):
+def get_instance_data(data_path: Union[str, Path]):
     with data_path.open("r") as file:
-        capacity_vector = np.array(file.readline().split(), dtype=np.int32)
+        capacity_vector = np.array(file.readline().split(), dtype=int).tolist()
         revenues = np.array(file.readline().split(), dtype=np.float32) * 100
         requests = np.loadtxt(file, dtype=np.int32)
         
@@ -32,5 +32,5 @@ def get_instance_date(data_path: Union[str, Path]):
     #print(instance)
     return(DrauspInstanceData(num_slots, num_requests, capacity_vector, instance))
 
-data_DRAUSP = get_instance_date(PROJECT_ROOT / "instances" / "lion18s" / "SA01.txt")
-print(data_DRAUSP.num_slots)
+data_DRAUSP = get_instance_data(PROJECT_ROOT / "instances" / "lion18s" / "SA01.txt")
+print(data_DRAUSP.capacity_vector)
