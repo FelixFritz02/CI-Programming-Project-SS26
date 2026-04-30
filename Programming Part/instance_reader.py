@@ -32,5 +32,6 @@ def get_instance_data(data_path: Union[str, Path]):
     #print(instance)
     return(DrauspInstanceData(num_slots, num_requests, capacity_vector, instance))
 
-data_DRAUSP = get_instance_data(PROJECT_ROOT / "instances" / "lion18s" / "SA01.txt")
-print(data_DRAUSP.capacity_vector)
+if __name__ == "__main__":
+    data = get_instance_data(PROJECT_ROOT / "instances" / "lion18s" / "SA01.txt")
+    print(data.capacity_vector)
