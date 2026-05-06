@@ -28,7 +28,7 @@ class DrauspEnv(gym.Env):
     Reward:
         - Ablehnen: 0
         - Akzeptieren (gültig): r (Erlös der Anfrage)
-        - Ungültige Aktion:    -100 (Kapazität überschritten oder Slot ungültig)
+        - Ungültige Aktion:    -20 (Kapazität überschritten oder Slot ungültig)
     """
 
     metadata = {"render_modes": ["human"]}
@@ -41,6 +41,7 @@ class DrauspEnv(gym.Env):
         lam: float = 1.0,
         instance=None,          # Feste Instanz (z.B. aus instance_reader)
         render_mode: Optional[str] = None,
+        fixed_request_length: int = None
     ):
         super().__init__()
 
@@ -58,7 +59,10 @@ class DrauspEnv(gym.Env):
         # -------------------------------------------------------------------
         # Aktionsraum: 0 = ablehnen, 1..K = Startslot
         # -------------------------------------------------------------------
-        self.action_space = spaces.Discrete(K + 1)
+        if fixed_request_length is not None:
+            self.action_space = spaces.Discrete(K + 2 - fixed_request_length)
+        else:
+            self.action_space = spaces.Discrete(K + 1)
 
         # -------------------------------------------------------------------
         # Beobachtungsraum:
@@ -154,7 +158,7 @@ class DrauspEnv(gym.Env):
 
         # --- Ungültige Aktion: Slot zu weit rechts ---
         if action > 0 and (len_q + action - 1) > K:
-            reward = -100.0
+            reward = -20.0
             terminated = True
             obs = np.array(state, dtype=np.float32)
             info = {"valid_actions": []}
@@ -174,7 +178,7 @@ class DrauspEnv(gym.Env):
 
         # --- Kapazitätsverletzung prüfen ---
         if any(c < 0 for c in new_caps):
-            reward = -100.0
+            reward = -20.0
             terminated = True
             # Zustand trotzdem aktualisieren (für Debugging)
             next_t = self._t + 1
