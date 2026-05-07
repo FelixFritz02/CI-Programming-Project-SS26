@@ -295,7 +295,7 @@ class DQNAgent:
 # Schnelltest
 # -----------------------------------------------------------------------
 if __name__ == "__main__":
-    from drausp_env import DrauspEnv
+    from gymnasium_env import DrauspEnv
 
     env = DrauspEnv(K=5, T_d=20, C_k=[20] * 5)
     agent = DQNAgent(env, lr=1e-3, gamma=0.9, epsilon_decay=0.995)

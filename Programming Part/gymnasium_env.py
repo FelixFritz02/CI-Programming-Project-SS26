@@ -125,6 +125,7 @@ class DrauspEnv(gym.Env):
     # ------------------------------------------------------------------
 
     def reset(self, *, seed=None, options=None, show_instance=False):
+        """setzt environment wieder in Anfangszustand"""
         super().reset(seed=seed)
 
         # Neue oder feste Instanz laden
@@ -149,6 +150,7 @@ class DrauspEnv(gym.Env):
         return obs, info
 
     def step(self, action):
+        """nimmt eine action und berechnet den Reward und die state transition"""
         state = self._state
         K = self.K
         len_q = self._length_of_request(state)
