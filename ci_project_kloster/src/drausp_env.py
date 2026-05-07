@@ -13,7 +13,7 @@ from drausp_instance_data import DrauspInstanceData, get_instance_data
 class DrauspEnv(gym.Env):
 
     def __init__(self, instance_data: DrauspInstanceData):
-        self.instance = instance_datpri
+        self.instance = instance_data
 
         self.obs_size = (
             self.instance.num_dimensions * (self.instance.num_moves + 1)
