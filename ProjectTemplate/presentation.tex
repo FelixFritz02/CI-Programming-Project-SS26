@@ -8,7 +8,7 @@
 \usepackage{amssymb}
 \usepackage{xcolor}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
 
 % Farben
 \definecolor{tugreen}{RGB}{0, 110, 80}
@@ -20,9 +20,9 @@
 \setbeamercolor{title}{bg=tugreen, fg=white}
 
 % Titelseite
-\title[DRAUSP als RL-Problem]{Modellierung des DRAUSP-Problems\\als Reinforcement-Learning-Umgebung}
-\subtitle{Gymnasium-Umgebung mit DQN und Action Masking}
-\author{Bachelorarbeit}
+\title[DRAUSP als RL-Problem]{Modellierung des DRAUSP-Problems\\als Reinforcement-Learning-Problem}
+\subtitle{DQN, Action Masking, Monotonicity-aware DQN}
+\author{Niklas Fritz, Felix Fritz}
 \date{\today}
 
 % -----------------------------------------------------------------------
@@ -50,22 +50,22 @@
   \begin{block}{Problemstellung}
     Gegeben $T_d$ Anfragen, die sequenziell eintreffen. Jede Anfrage~$i$ besitzt:
     \begin{itemize}
-      \item einen \textbf{Erloes} $r_i \in \mathbb{R}$
-      \item einen \textbf{Kapazitaetsbedarf} $q_i \in \mathbb{N}^K$ ueber $K$ Zeitslots
+      \item einen \textbf{Erlös} $r_i \in \mathbb{R}$
+      \item einen \textbf{Kapazitätsbedarf} $q_i \in \mathbb{N}^K$ über $K$ Zeitslots
     \end{itemize}
   \end{block}
 
   \bigskip
   \begin{block}{Entscheidung}
-    Fuer jede Anfrage muss \textbf{sofort und unwiderruflich} entschieden werden:
+    Für jede Anfrage muss \textbf{sofort und unwiderruflich} entschieden werden:
     \begin{itemize}
-      \item \textbf{Ablehnen} $\rightarrow$ Erloes $= 0$
-      \item \textbf{Akzeptieren ab Slot $k$} $\rightarrow$ Erloes $= r_i$, Kapazitaeten werden reduziert
+      \item \textbf{Ablehnen} $\rightarrow$ Erlös $= 0$
+      \item \textbf{Akzeptieren ab Slot $k$} $\rightarrow$ Erlös $= r_i$, Kapazitäten werden reduziert
     \end{itemize}
   \end{block}
 
   \bigskip
-  \textbf{Ziel:} Maximierung des \textbf{Gesamterloesei} unter Einhaltung der Kapazitaetsschranken $C_k$.
+  \textbf{Ziel:} Maximierung des \textbf{Gesamterlöses} unter Einhaltung der Kapazitätsschranken $C_k$.
 
 \end{frame}
 
@@ -119,18 +119,18 @@
 \begin{frame}{Q-Learning -- Policy aus Q-Werten}
 
   \begin{block}{Q-Funktion}
-    $Q(s, a)$ bewertet, wie gut es ist, in Zustand $s$ die Aktion $a$ zu waehlen
-    -- unter Beruecksichtigung \textbf{aller zukuenftigen Rewards}.
+    $Q(s, a)$ bewertet, wie gut es ist, in Zustand $s$ die Aktion $a$ zu wählen
+    -- unter Berücksichtigung \textbf{aller zukünftigen Rewards}.
   \end{block}
 
   \bigskip
-  \begin{columns}
+  \begin{columns}[T]
     \column{0.55\textwidth}
       \textbf{Optimale Policy:}
       \[
         \pi^*(s) \;=\; \arg\max_{a \in \mathcal{A}}\; Q^*(s, a)
       \]
-      Der Agent waehlt stets die Aktion mit dem \textbf{hoechsten Q-Wert}.
+      Der Agent wählt stets die Aktion mit dem \textbf{höchsten Q-Wert}.
 
       \bigskip
       \textbf{Lernregel (Bellman):}
@@ -140,7 +140,7 @@
       \begin{itemize}
         \item $\gamma \in [0,1]$: Diskontierungsfaktor
         \item $r$: unmittelbarer Reward
-        \item $\max_{a'} Q(s', a')$: bester zukuenftiger Wert
+        \item $\max_{a'} Q(s', a')$: bester zukünftiger Wert
       \end{itemize}
 
     \column{0.45\textwidth}
@@ -167,27 +167,19 @@
 \begin{frame}{Deep Q-Network (DQN)}
 
   \begin{block}{Warum ein neuronales Netz?}
-    Der Zustandsraum ist zu gross, um $Q(s,a)$ tabellarisch zu speichern
-    $\rightarrow$ ein \textbf{neuronales Netz} approximiert $Q(s,a)$ fuer alle Aktionen gleichzeitig.
+    Der Zustandsraum ist zu groß, um $Q(s,a)$ tabellarisch zu speichern
+    $\rightarrow$ ein \textbf{neuronales Netz} approximiert $Q(s,a)$ für alle Aktionen gleichzeitig.
   \end{block}
 
   \bigskip
-  \textbf{Schluesselideen des DQN:}
+  \textbf{Schlüsselideen des DQN:}
   \begin{itemize}
-    \item \textbf{Replay Buffer}: Erfahrungen $(s, a, r, s')$ werden gespeichert und zufaellig
+    \item \textbf{Replay Buffer}: Erfahrungen $(s, a, r, s')$ werden gespeichert und zufällig
           gesampelt $\rightarrow$ bricht zeitliche Korrelationen auf
     \item \textbf{Target-Netz}: zweites, seltener aktualisiertes Netz stabilisiert das Training
     \item \textbf{$\varepsilon$-Greedy}: Balance zwischen Exploration und Exploitation
     \item \textbf{Gradient Clipping}: verhindert explodierende Gradienten
   \end{itemize}
-
-  \bigskip
-  \begin{block}{Soft Update des Target-Netzes}
-    \[
-      \theta_{\text{target}} \;\leftarrow\; \tau \cdot \theta_{\text{policy}}
-      + (1 - \tau) \cdot \theta_{\text{target}}, \quad \tau \ll 1
-    \]
-  \end{block}
 
 \end{frame}
 
@@ -209,9 +201,9 @@
     \textbf{Komponente} & \textbf{Bedeutung} & \textbf{Wertebereich} \\
     \hline
     $t$ & aktueller Zeitschritt & $\{1, \ldots, T_d\}$ \\
-    $\hat{C}_k$ & verbleibende Kapazitaet in Slot $k$ & $\{0, \ldots, C_k\}$ \\
-    $r$ & Erloes der aktuellen Anfrage & $\mathbb{R}_{\geq 0}$ \\
-    $q_k$ & benoetigter Bedarf in Slot $k$ & $\{0, \ldots, C_k\}$ \\
+    $\hat{C}_k$ & verbleibende Kapazität in Slot $k$ & $\{0, \ldots, C_k\}$ \\
+    $r$ & Erlös der aktuellen Anfrage & $\mathbb{R}_{\geq 0}$ \\
+    $q_k$ & benötigter Bedarf in Slot $k$ & $\{0, \ldots, C_k\}$ \\
     \hline
   \end{tabular}
 
@@ -224,13 +216,13 @@
 \end{frame}
 
 % -----------------------------------------------------------------------
-\begin{frame}{Aktionsraum und Uebergangsfunktion}
+\begin{frame}{Aktionsraum und Übergangsfunktion}
 
   \begin{block}{Aktionsraum $\mathcal{A} = \{0, 1, \ldots, K\}$}
     \begin{itemize}
-      \item \textbf{Aktion $0$:} Anfrage ablehnen $\rightarrow$ Kapazitaeten unveraendert
+      \item \textbf{Aktion $0$:} Anfrage ablehnen $\rightarrow$ Kapazitäten unverändert
       \item \textbf{Aktion $k > 0$:} Anfrage ab Slot $k$ einplanen
-            $\rightarrow$ $\hat{C}_{k+i} \leftarrow \hat{C}_{k+i} - q_i$ fuer $i = 0, \ldots, \ell_q - 1$
+            $\rightarrow$ $\hat{C}_{k+i} \leftarrow \hat{C}_{k+i} - q_i$ für $i = 0, \ldots, \ell_q - 1$
     \end{itemize}
   \end{block}
 
@@ -239,9 +231,9 @@
     \[
       R(s, a) =
       \begin{cases}
-        r    & \text{Akzeptieren, Kapazitaet ausreichend} \\
+        r    & \text{Akzeptieren, Kapazität ausreichend} \\
         0    & \text{Ablehnen} \\
-        -100 & \text{ungueltge Aktion (Kapazitaetsverletzung)}
+        -100 & \text{ungültige Aktion (Kapazitätsverletzung)}
       \end{cases}
     \]
   \end{block}
@@ -250,52 +242,52 @@
   \textbf{Episode endet} (\texttt{terminated} $=$ True), wenn:
   \begin{itemize}
     \item alle $T_d$ Anfragen abgearbeitet wurden, \textbf{oder}
-    \item eine ungueltige Aktion gewaehlt wurde
+    \item eine ungültige Aktion gewählt wurde
   \end{itemize}
 
 \end{frame}
 
 % -----------------------------------------------------------------------
-\section{Das Problem der ungueltigen Aktionen}
+\section{Das Problem der ungültigen Aktionen}
 % -----------------------------------------------------------------------
 
-\begin{frame}{Das Problem der ungueltigen Aktionen}
+\begin{frame}{Das Problem der ungültigen Aktionen}
 
   \begin{alertblock}{Problem}
-    Nicht jede Aktion $a \in \mathcal{A}$ ist in jedem Zustand \textbf{zulaessig}!
+    Nicht jede Aktion $a \in \mathcal{A}$ ist in jedem Zustand \textbf{zulässig}!
   \end{alertblock}
 
   \bigskip
-  \textbf{Zwei Arten von ungueltigen Aktionen:}
+  \textbf{Zwei Arten von ungültigen Aktionen:}
 
   \begin{enumerate}
     \item \textbf{Slot zu weit rechts:} \quad $\ell_q + a - 1 > K$ \\
-          {\small Die Anfrage wuerde ueber den letzten Slot hinausragen.}
+          {\small Die Anfrage würde über den letzten Slot hinausragen.}
 
     \bigskip
-    \item \textbf{Kapazitaetsverletzung:} \quad $\exists\, i:\; \hat{C}_{a+i} < q_i$ \\
-          {\small Die verbleibende Kapazitaet reicht nicht aus.}
+    \item \textbf{Kapazitätsverletzung:} \quad $\exists\, i:\; \hat{C}_{a+i} < q_i$ \\
+          {\small Die verbleibende Kapazität reicht nicht aus.}
   \end{enumerate}
 
   \bigskip
-  \begin{block}{Konsequenz fuer Standard-DQN}
-    Ein Standard-DQN ohne Behandlung ungueltiger Aktionen waehlt per $\arg\max$ ggf.
-    eine unzulaessige Aktion $\rightarrow$ Reward $= -100$ $\rightarrow$
+  \begin{block}{Konsequenz für Standard-DQN}
+    Ein Standard-DQN ohne Behandlung ungültiger Aktionen wählt per $\arg\max$ ggf.
+    eine unzulässige Aktion $\rightarrow$ Reward $= -100$ $\rightarrow$
     \textbf{instabiles, langsames Training}.
   \end{block}
 
 \end{frame}
 
 % -----------------------------------------------------------------------
-\begin{frame}{Action Masking -- Loesung}
+\begin{frame}{Action Masking -- Lösung}
 
   \begin{block}{Idee}
-    Ungueltige Aktionen erhalten \textbf{vor der Auswahl} einen Q-Wert von $-\infty$,
-    sodass $\arg\max$ sie niemals waehlt.
+    Ungültige Aktionen erhalten \textbf{vor der Auswahl} einen Q-Wert von $-\infty$,
+    sodass $\arg\max$ sie niemals wählt.
   \end{block}
 
   \bigskip
-  \textbf{Action Masking muss an \emph{zwei} Stellen erfolgen:}
+  \textbf{Action Masking im Policy und Target-Netz:}
 
   \begin{columns}
     \column{0.5\textwidth}
@@ -311,22 +303,9 @@
           a^* = \arg\max_{a}\, \tilde{Q}(s,a)
         \]
       \end{exampleblock}
-
-    \column{0.5\textwidth}
-      \begin{exampleblock}{2. Bellman-Target (Training)}
-        \[
-          \tilde{Q}_{\text{target}}(s',a') =
-          \begin{cases}
-            Q_{\text{target}}(s',a') & a' \in \mathcal{A}_{\text{valid}}(s') \\
-            -\infty                  & \text{sonst}
-          \end{cases}
-        \]
-        \[
-          y = r + \gamma \cdot \max_{a'}\, \tilde{Q}_{\text{target}}(s',a')
-        \]
-      \end{exampleblock}
   \end{columns}
-
+  \bigskip
+  Außerdem samplet man im $\epsilon$-Greedy-Verfahren nur aus den gültigen Aktionen $\mathcal{A}_{\text{valid}}(s)$.
 \end{frame}
 
 % -----------------------------------------------------------------------
@@ -336,8 +315,8 @@
 \begin{frame}{Gymnasium-Umgebung -- Interface}
 
   \begin{block}{Gymnasium}
-    Standardisiertes Python-Interface fuer RL-Umgebungen --
-    kompatibel mit gaengigen RL-Bibliotheken.
+    Standardisiertes Python-Interface für RL-Umgebungen --
+    kompatibel mit gängigen RL-Bibliotheken.
   \end{block}
 
   \bigskip
@@ -346,18 +325,18 @@
   \medskip
   \begin{tabular}{lll}
     \hline
-    \textbf{Methode} & \textbf{Rueckgabe} & \textbf{Bedeutung} \\
+    \textbf{Methode} & \textbf{Rückgabe} & \textbf{Bedeutung} \\
     \hline
     \texttt{reset()} & \texttt{obs, info} & Neue Episode starten \\
-    \texttt{step(action)} & \texttt{obs, r, terminated, truncated, info} & Schritt ausfuehren \\
+    \texttt{step(action)} & \texttt{obs, r, terminated, truncated, info} & Schritt ausführen \\
     \texttt{render()} & -- & Zustand visualisieren \\
     \hline
   \end{tabular}
 
   \medskip
-  \textcolor{extramethod}{\textbf{Eigene Erweiterung fuer Action Masking:}}\\[0.3em]
+  \textcolor{extramethod}{\textbf{Eigene Erweiterung für Action Masking:}}\\[0.3em]
   \textcolor{extramethod}{\texttt{get\_valid\_actions()} $\;\rightarrow\;$ \texttt{list[int]}}
-  \quad {\small Gibt alle zulaessigen Aktionen im aktuellen Zustand zurueck.}
+  \quad {\small Gibt alle zulässigen Aktionen im aktuellen Zustand zurück.}
 
 \end{frame}
 
@@ -394,12 +373,12 @@
   \begin{enumerate}
 
     \item \textbf{Allgemeiner Aktionsraum} \\
-          Bisher: feste Requestgroesse $\ell_q$.
-          Geplant: variable Requestgroessen
+          Bisher: feste Requestgröße $\ell_q$.
+          Geplant: variable Requestgrößen
 
     \bigskip
     \item \textbf{Monotone Neural Networks} \\
-          Architektur erzwingt strukturelle Monotonie in Kapazitaeten und Erloes:
+          Architektur erzwingt strukturelle Monotonie in Kapazitäten und Erlös:
           \[
             \hat{C}_k \uparrow \;\Rightarrow\; Q(s,a) \uparrow
             \qquad\qquad
@@ -410,15 +389,13 @@
     \item \textbf{Evaluation auf Benchmark-Instanzen} \\
           \begin{itemize}
             \item \textbf{Konvergenzgeschwindigkeit}: Anzahl Episoden bis zur Stabilisierung
-            \item \textbf{Trainings-Stabilitaet}: Varianz des kumulierten Rewards (Sample-Varianz)
-            \item \textbf{Sample-Effizienz}: erreichter Reward pro Umgebungsinteraktion
+            \item \textbf{Trainings-Stabilität}: Varianz des kumulierten Rewards (Sample-Varianz)
             \item \textbf{Generalisierung}: Out-of-sample Performance auf ungesehenen Instanzen
           \end{itemize}
 
     \bigskip
     \item \textbf{Hyperparameter-Analyse} \\
-          Lernrate $\alpha$, Diskontierungsfaktor $\gamma$,
-          Soft-Update-Rate $\tau$, Replay-Buffer-Groesse, Netzwerkarchitektur
+          Exploration-Faktor $\epsilon$, Diskontierungsfaktor $\gamma$, Replay-Buffer-Größe, Netzwerkarchitektur
 
   \end{enumerate}
 
