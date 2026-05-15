@@ -7,7 +7,9 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{xcolor}
+\usepackage{mdframed}
 \usepackage{tikz}
+\usepackage{amsmath}
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
 
 % Farben
@@ -23,7 +25,7 @@
 \title[DRAUSP als RL-Problem]{Modellierung des DRAUSP-Problems\\als Reinforcement-Learning-Problem}
 \subtitle{DQN, Action Masking, Monotonicity-aware DQN}
 \author{Niklas Fritz, Felix Fritz}
-\date{\today}
+\date{21.05.2026}
 
 % -----------------------------------------------------------------------
 \begin{document}
@@ -72,24 +74,51 @@
 % -----------------------------------------------------------------------
 \section{Grundlagen: Reinforcement Learning}
 % -----------------------------------------------------------------------
+\begin{frame}{Reinforcement Learning -- Grundprinzip}
+  \begin{columns}
+    \column{0.5\textwidth}
+     \begin{block}{Kernidee}
+        Ein \textbf{Agent} interagiert mit einer \textbf{Umgebung} und lernt durch
+        Versuch und Irrtum eine optimale \textbf{Policy} $\pi$.
+      \end{block}
+
+    \column{0.5\textwidth}
+      \begin{tikzpicture}[
+        node distance=1.8cm,
+        box/.style={rectangle, draw=tugreen, thick, rounded corners,
+                    minimum width=2.2cm, minimum height=0.9cm,
+                    fill=tugreen!10, align=center, font=\small},
+        arr/.style={-{Stealth}, thick, tugreen}
+      ]
+        \node[box] (agent) {Agent\\$\pi(a\mid s)$};
+        \node[box, below=2.2cm of agent] (env) {Umgebung};
+
+        \draw[arr] (agent.east) -- ++(1.2,0)
+              node[midway, above right, font=\footnotesize]{Aktion $a_t$}
+              |- (env.east);
+
+        \draw[arr] (env.west) -- ++(-1.2,0)
+              node[midway, below left, align=center, font=\footnotesize]{Zustand $s_{t+1}$\\Reward $r_t$}
+              |- (agent.west);
+      \end{tikzpicture}
+  \end{columns}
+
+\end{frame}
 
 \begin{frame}{Reinforcement Learning -- Grundprinzip}
 
   \begin{columns}
     \column{0.5\textwidth}
-      \begin{block}{Kernidee}
-        Ein \textbf{Agent} interagiert mit einer \textbf{Umgebung} und lernt durch
-        Versuch und Irrtum eine optimale \textbf{Policy} $\pi$.
-      \end{block}
-
-      \bigskip
       \textbf{Zentrale Komponenten:}
       \begin{itemize}
         \item \textbf{Zustand} $s \in \mathcal{S}$
         \item \textbf{Aktion} $a \in \mathcal{A}$
-        \item \textbf{Reward} $r$
-        \item \textbf{Policy} $\pi(a \mid s)$
-        \item \textbf{Q-Funktion} $Q(s,a)$
+        \item \textbf{Reward} $r: S \times A \to P(\mathbb{R})$
+        \item \textbf{Policy} $\pi(a \mid s): S \to P(A)$
+        \item goal: \textbf{Maximiere den erwarteten kumulierten Reward}
+         \begin{equation*}
+      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{\infty}\gamma^{t} r_t\Bigg]
+         \end{equation*}
       \end{itemize}
 
     \column{0.5\textwidth}
@@ -119,8 +148,7 @@
 \begin{frame}{Q-Learning -- Policy aus Q-Werten}
 
   \begin{block}{Q-Funktion}
-    $Q(s, a)$ bewertet, wie gut es ist, in Zustand $s$ die Aktion $a$ zu wählen
-    -- unter Berücksichtigung \textbf{aller zukünftigen Rewards}.
+    $Q(s, a)$ gibt den erwarteten kumulierten Reward an, wenn man in Zustand $s$ die Aktion $a$ wählt.
   \end{block}
 
   \bigskip
@@ -163,26 +191,42 @@
 
 \end{frame}
 
-% -----------------------------------------------------------------------
 \begin{frame}{Deep Q-Network (DQN)}
 
   \begin{block}{Warum ein neuronales Netz?}
-    Der Zustandsraum ist zu groß, um $Q(s,a)$ tabellarisch zu speichern
+    Zustandsraum zu groß, um $Q(s,a)$ tabellarisch zu speichern ($Q \in \mathbb{R}^{\vert S \vert \times \vert A \vert}$)
     $\rightarrow$ ein \textbf{neuronales Netz} approximiert $Q(s,a)$ für alle Aktionen gleichzeitig.
   \end{block}
 
   \bigskip
-  \textbf{Schlüsselideen des DQN:}
+  \begin{mdframed}[backgroundcolor=gray!20, , hidealllines=true]
+    $$
+      Q(\cdot \vert \theta_{DQN}): \quad s \xrightarrow{\text{DQN}}   \begin{pmatrix} Q(s, a_1) \\ Q(s, a_2) \\ \vdots \\ Q(s, a_N) \end{pmatrix}
+    $$
+\end{mdframed}
+
+\end{frame}
+% -----------------------------------------------------------------------
+\begin{frame}{Deep Q-Network (DQN)}
+  \textbf{Training des DQN:}
   \begin{itemize}
+    \item \textbf{Loss-Funktion}: \textbf{MSE} zwischen Zielwert $y_i$ und Vorhersage $Q(s_i, a_i; \theta^{DQN})$
+  \begin{mdframed}[backgroundcolor=gray!20, , hidealllines=true]
+    \begin{equation*}
+        \begin{split}
+             &L(\theta^{DQN}) = \frac{1}{N} \sum_{i} (y_i - Q(s_i, a_i; \theta^{DQN})), \\
+            &\theta^{DQN} \leftarrow \theta^{DQN} - \alpha \nabla_{\theta^{DQN}} L(\theta^{DQN})
+        \end{split}
+  \end{equation*}
+  \end{mdframed}
     \item \textbf{Replay Buffer}: Erfahrungen $(s, a, r, s')$ werden gespeichert und zufällig
-          gesampelt $\rightarrow$ bricht zeitliche Korrelationen auf
+          gesampelt 
     \item \textbf{Target-Netz}: zweites, seltener aktualisiertes Netz stabilisiert das Training
     \item \textbf{$\varepsilon$-Greedy}: Balance zwischen Exploration und Exploitation
     \item \textbf{Gradient Clipping}: verhindert explodierende Gradienten
   \end{itemize}
 
 \end{frame}
-
 % -----------------------------------------------------------------------
 \section{Modellierung als RL-Problem}
 % -----------------------------------------------------------------------

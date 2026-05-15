@@ -1,6 +1,6 @@
 \beamer@sectionintoc {1}{Das DRAUSP-Problem}{3}{0}{1}
 \beamer@sectionintoc {2}{Grundlagen: Reinforcement Learning}{4}{0}{2}
-\beamer@sectionintoc {3}{Modellierung als RL-Problem}{7}{0}{3}
-\beamer@sectionintoc {4}{Das Problem der ungültigen Aktionen}{9}{0}{4}
-\beamer@sectionintoc {5}{Gymnasium-Implementierung}{11}{0}{5}
-\beamer@sectionintoc {6}{Zusammenfassung \& Ausblick}{12}{0}{6}
+\beamer@sectionintoc {3}{Modellierung als RL-Problem}{9}{0}{3}
+\beamer@sectionintoc {4}{Das Problem der ungültigen Aktionen}{11}{0}{4}
+\beamer@sectionintoc {5}{Gymnasium-Implementierung}{13}{0}{5}
+\beamer@sectionintoc {6}{Zusammenfassung \& Ausblick}{14}{0}{6}
