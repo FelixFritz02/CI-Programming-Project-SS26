@@ -11,10 +11,10 @@ class LatticeDQNNetwork(nn.Module):
         # Konfiguration der Monotonie 
         K = (input_dim - 2) // 2
         self.mono_configs = (
-            [Monotonicity.DECREASING] +    # Zeit t
+            [None] +    # Zeit t
             [Monotonicity.INCREASING] * K + # Kapazitäten C_k
-            [Monotonicity.INCREASING] +    # Erlös r
-            [Monotonicity.DECREASING] * K   # Benötigte Kapazität q_k
+            [None] +    # Erlös r
+            [None] * K   # Benötigte Kapazität q_k
         )
 
         # kalibirieren der input auf 0,1 skala mit monotonem stückweise linearem Kalibrator
@@ -54,5 +54,3 @@ class LatticeDQNNetwork(nn.Module):
         # Constraints auf alle Kalibratoren und alle Gitter anwenden
         for cal in self.calibrators:
             cal.apply_constraints()
-        for lat in self.lattices:
-            lat.apply_constraints()
