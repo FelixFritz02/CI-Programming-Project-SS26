@@ -48,9 +48,8 @@
 
   \textbf{Dynamic Resource Allocation Under Stochastic Prices (DRAUSP)}
 
-  \bigskip
   \begin{block}{Problemstellung}
-    Gegeben $T_d$ Anfragen, die sequenziell eintreffen. Jede Anfrage~$i$ besitzt:
+    Gegeben: Serviceperiode mit $K$ Zeitslots der Kapazität $C_k$, $T_d$ Anfragen, die sequenziell eintreffen. Jede Anfrage $i$ hat:
     \begin{itemize}
       \item einen \textbf{Erlös} $r_i \in \mathbb{R}$
       \item einen \textbf{Kapazitätsbedarf} $q_i \in \mathbb{N}^K$ über $K$ Zeitslots
@@ -66,8 +65,7 @@
     \end{itemize}
   \end{block}
 
-  \bigskip
-  \textbf{Ziel:} Maximierung des \textbf{Gesamterlöses} unter Einhaltung der Kapazitätsschranken $C_k$.
+  \textbf{Ziel:} Maximiere \textbf{Gesamterlöses} unter Einhaltung der Kapazitätsschranken $C_k$.
 
 \end{frame}
 
@@ -210,6 +208,8 @@
 \begin{frame}{Deep Q-Network (DQN)}
   \textbf{Training des DQN:}
   \begin{itemize}
+    \item \textbf{Replay Buffer}: Erfahrungen $(s, a, r, s')$ werden gespeichert und zufällig
+          gesampelt
     \item \textbf{Loss-Funktion}: \textbf{MSE} zwischen Zielwert $y_i$ und Vorhersage $Q(s_i, a_i; \theta^{DQN})$
   \begin{mdframed}[backgroundcolor=gray!20, , hidealllines=true]
     \begin{equation*}
@@ -218,9 +218,7 @@
             &\theta^{DQN} \leftarrow \theta^{DQN} - \alpha \nabla_{\theta^{DQN}} L(\theta^{DQN})
         \end{split}
   \end{equation*}
-  \end{mdframed}
-    \item \textbf{Replay Buffer}: Erfahrungen $(s, a, r, s')$ werden gespeichert und zufällig
-          gesampelt 
+  \end{mdframed} 
     \item \textbf{Target-Netz}: zweites, seltener aktualisiertes Netz stabilisiert das Training
     \item \textbf{$\varepsilon$-Greedy}: Balance zwischen Exploration und Exploitation
     \item \textbf{Gradient Clipping}: verhindert explodierende Gradienten
