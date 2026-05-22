@@ -103,6 +103,11 @@ class DQNAgent:
 
         # Optimierer & Loss
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+        self.optimizer = optim.Adam([
+            {'params': self.policy_net.dqn.parameters(),           'lr': lr},
+            {'params': self.policy_net.c_calibrators.parameters(), 'lr': lr * 5},
+            {'params': self.policy_net.c_lattice.parameters(),     'lr': lr * 5},
+        ])
         self.loss_fn   = nn.MSELoss()
 
         # Replay Buffer
