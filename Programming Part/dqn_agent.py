@@ -79,6 +79,8 @@ class DQNAgent:
         warmup_steps: int = 500,
         tau: float = 0.005,
         max_grad_norm: float = 10.0,
+        mono_lambda: float = 0.1,
+        mono_noise_scale: float = 3.0,
     ):
         self.env = env
         self.gamma = gamma
@@ -90,6 +92,8 @@ class DQNAgent:
         self.warmup_steps = warmup_steps
         self.tau = tau
         self.max_grad_norm = max_grad_norm
+        self.mono_lambda = mono_lambda
+        self.mono_noise_scale = mono_noise_scale
 
         # Dimensionen aus der Umgebung auslesen
         input_dim  = env.observation_space.shape[0]   # 2*K + 2
@@ -164,6 +168,33 @@ class DQNAgent:
 
     def _train_step(self):
         states, actions, rewards, next_states, dones = self.buffer.sample(self.batch_size)
+        
+        # ----------------------------------------------------------
+        # Monotone Vergleichsstates erzeugen
+        # C'_k >= C_k
+        # ----------------------------------------------------------
+
+        states_mono = states.clone()
+
+        K = self.env.K
+
+        # Zufällige positive Kapazitätserhöhung
+        noise = torch.rand(
+            (states.shape[0], K),
+            dtype=torch.float32,
+        ) * self.mono_noise_scale
+
+        # Kapazitäten modifizieren
+        states_mono[:, 1:K+1] += noise
+
+        # Auf maximale Kapazität clippen
+        max_cap = max(self.env.C_k)
+
+        states_mono[:, 1:K+1] = torch.clamp(
+            states_mono[:, 1:K+1],
+            max=max_cap
+        )
+        #____________________________________________________________________________________
 
         # Q(s, a) – aktuelles Netz
         q_values = self.policy_net(states).gather(1, actions)
@@ -183,6 +214,21 @@ class DQNAgent:
             targets = rewards + self.gamma * (1 - dones) * next_q_values
 
         loss = self.loss_fn(q_values, targets)
+        # ----------------------------------------------------------
+        # Monotonicity Penalty
+        # Forderung:
+        #   Q(states_mono, a) >= Q(states, a)
+        # ----------------------------------------------------------
+
+        q_orig = self.policy_net(states)
+        q_mono = self.policy_net(states_mono)
+
+        mono_violations = torch.relu(q_orig - q_mono)
+
+        mono_loss = mono_violations.mean()
+        
+        loss = loss + self.mono_lambda * mono_loss
+        #------------------------------------------------------------------
 
         self.optimizer.zero_grad()
         loss.backward()
