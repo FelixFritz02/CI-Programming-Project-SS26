@@ -232,13 +232,33 @@ class DQNAgent:
     # Trainingsschleife
     # ------------------------------------------------------------------
 
-    def train(self, num_episodes: int = 500, verbose: bool = True) -> list:
+    def train(
+        self,
+        num_episodes: int = 500,
+        verbose: bool = True,
+        eval_monotonicity_every: int = 50,
+        monotonicity_pairs: int = 100,
+    ) -> tuple:
         """
         Trainiert den Agenten für `num_episodes` Episoden.
 
-        Gibt die Liste der kumulierten Rewards pro Episode zurück.
+        Alle `eval_monotonicity_every` Episoden wird `evaluate_monotonicity`
+        aufgerufen und die Ratio geloggt.
+
+        Parameter
+        ----------
+        num_episodes             : Anzahl Trainingsepisoden
+        verbose                  : Ausgabe nach je 50 Episoden
+        eval_monotonicity_every  : Intervall für Monotonie-Evaluation (0 = aus)
+        monotonicity_pairs       : Anzahl Paare pro Evaluation
+
+        Rückgabe
+        --------
+        reward_history      : kumulierter Reward je Episode
+        monotonicity_history: Liste von (episode, ratio)-Tupeln
         """
-        reward_history = []
+        reward_history: list = []
+        monotonicity_history: list = []
 
         for episode in range(num_episodes):
             obs, _ = self.env.reset()
@@ -277,7 +297,118 @@ class DQNAgent:
                       f"Avg(50): {avg:>8.2f}  "
                       f"ε: {self.epsilon:.3f}")
 
-        return reward_history
+            # Monotonie-Evaluation alle N Episoden
+            if eval_monotonicity_every > 0 and (episode + 1) % eval_monotonicity_every == 0:
+                ratio = self.evaluate_monotonicity(num_pairs=monotonicity_pairs)
+                monotonicity_history.append((episode + 1, ratio))
+                if verbose:
+                    print(f"  → Monotonie-Check (Episode {episode + 1:>4}): "
+                          f"{ratio * 100:.1f}% korrekt ({monotonicity_pairs} Paare)")
+
+        return reward_history, monotonicity_history
+
+    # ------------------------------------------------------------------
+    # Monotonie-Evaluation
+    # ------------------------------------------------------------------
+
+    def evaluate_monotonicity(self, num_pairs: int = 100) -> float:
+        """
+        Bewertet, wie monoton das aktuelle Q-Netz hinsichtlich der
+        Restkapazitäten ist.
+
+        Monotonie-Definition
+        --------------------
+        Für zwei Zustände s und s' mit identischem (t, r, q) gilt:
+            s dominiert s'  ⟺  Ĉ_k(s) ≥ Ĉ_k(s') für alle k
+                                UND Ĉ_k(s) > Ĉ_k(s') für mind. ein k
+
+        Dann sollte das Q-Netz erfüllen:
+            max_a Q(s, a) ≥ max_a Q(s', a)
+
+        Mehr Restkapazität bedeutet mehr zukünftige Handlungsmöglichkeiten,
+        also kann der erreichbare kumulierte Reward nie kleiner sein.
+
+        Vorgehen
+        ---------
+        1. Sampele `num_pairs` Zustandspaare durch zufällige Episoden.
+           Jedes Paar (s, s') teilt denselben Zeitschritt t sowie
+           dieselbe Anfrage (r, q) und unterscheidet sich nur in den
+           Restkapazitäten, wobei s alle Kapazitäten von s' dominiert.
+        2. Prüfe für jedes Paar, ob max_a Q(s) ≥ max_a Q(s').
+        3. Gib den Anteil korrekt geordneter Paare zurück (0.0 – 1.0).
+
+        Parameter
+        ----------
+        num_pairs : Anzahl der zu sampelnden Zustandspaare.
+
+        Rückgabe
+        --------
+        monotonicity_ratio : float ∈ [0, 1]
+            Anteil der Paare, bei denen das Netz korrekt monoton ist.
+        """
+        K = self.env.K
+
+        pairs: list[tuple[np.ndarray, np.ndarray]] = []
+
+        # Zustandspaare sammeln -------------------------------------------
+        # Strategie: Pro Episode zwei zufällig verschiedene Kapazitätsvektoren
+        # für denselben (t, r, q) konstruieren, sodass einer den anderen
+        # komponentenweise dominiert.
+        rng = np.random.default_rng()
+
+        while len(pairs) < num_pairs:
+            obs, _ = self.env.reset()
+            done = False
+
+            while not done and len(pairs) < num_pairs:
+                # Aktueller Zeitschritt und aktuelle Anfrage aus obs
+                t   = obs[0]
+                r   = obs[K + 1]
+                q   = obs[K + 2:]
+                cap = obs[1 : K + 1]   # aktuelle Restkapazitäten
+
+                # s' konstruieren: reduziere jeden Kapazitätseintrag um
+                # einen zufälligen Betrag ∈ [0, cap_k], mindestens ein
+                # Slot wird echt reduziert.
+                reductions = rng.integers(cap.astype(int)/2, cap.astype(int) + 1, size=K)
+                # Sicherstellen, dass Reduktion > 2
+                if reductions.sum() > 2:
+                    reductions[rng.integers(K)] = max(1, int(cap.max()))
+                    reductions = np.minimum(reductions, cap.astype(int))
+
+                cap_prime = cap - reductions.astype(np.float32)
+
+                # Paare nur aufnehmen wenn cap_prime alle Werte ≥ 0 hat
+                if np.all(cap_prime >= 0) and not np.array_equal(cap, cap_prime):
+                    s       = np.array([t] + list(cap)       + [r] + list(q), dtype=np.float32)
+                    s_prime = np.array([t] + list(cap_prime) + [r] + list(q), dtype=np.float32)
+                    pairs.append((s, s_prime))
+
+                # Zufällige gültige Aktion für nächsten Schritt
+                valid = self.env.get_valid_actions()
+                action = random.choice(valid)
+                obs, _, terminated, truncated, _ = self.env.step(action)
+                done = terminated or truncated
+        
+        # Q-Werte berechnen -----------------------------------------------
+        states       = torch.tensor(np.array([p[0] for p in pairs]), dtype=torch.float32)
+        states_prime = torch.tensor(np.array([p[1] for p in pairs]), dtype=torch.float32)
+
+        self.policy_net.eval()
+        with torch.no_grad():
+            q_raw_s       = self.policy_net(states)         # (num_pairs, A)
+            q_raw_s_prime = self.policy_net(states_prime)   # (num_pairs, A)
+
+            q_masked_s       = self._batch_mask_q_values(q_raw_s,       [p[0].tolist() for p in pairs])
+            q_masked_s_prime = self._batch_mask_q_values(q_raw_s_prime, [p[1].tolist() for p in pairs])
+
+            q_s       = q_masked_s.max(dim=1).values
+            q_s_prime = q_masked_s_prime.max(dim=1).values
+        self.policy_net.train()
+
+        correct = (q_s >= q_s_prime).float().mean().item()
+
+        return correct
 
     def save(self, path: str):
         """Speichert die Gewichte des Policy-Netzes."""
@@ -300,7 +431,7 @@ if __name__ == "__main__":
     env = DrauspEnv(K=5, T_d=20, C_k=[20] * 5)
     agent = DQNAgent(env, lr=1e-3, gamma=0.9, epsilon_decay=0.995)
 
-    reward_history = agent.train(num_episodes=500)
+    reward_history, monotonicity_history = agent.train(num_episodes=500)
 
     print(f"\nBestes Ergebnis:       {max(reward_history):.2f}")
     print(f"Durchschnitt (letzte 50): {np.mean(reward_history[-50:]):.2f}")
