@@ -4,33 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
+from lattice_dqn import LatticeDQNNetwork
 
-
-# -----------------------------------------------------------------------
-# Neuronales Netz
-# -----------------------------------------------------------------------
-
-class DQNNetwork(nn.Module):
-    """
-    Einfaches Feed-Forward-Netz zur Q-Wert-Approximation.
-
-    Architektur: input → 256 → 256 → 128 → output
-    """
-
-    def __init__(self, input_dim: int, output_dim: int):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, output_dim),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x)
 
 
 # -----------------------------------------------------------------------
@@ -93,6 +68,7 @@ class DQNAgent:
     def __init__(
         self,
         env,
+        QnetworkClass,
         lr: float = 1e-3,
         gamma: float = 0.9,
         epsilon_start: float = 1.0,
@@ -121,13 +97,21 @@ class DQNAgent:
         output_dim = env.action_space.n               # K + 1
 
         # Netzwerke
-        self.policy_net = DQNNetwork(input_dim, output_dim)
-        self.target_net = DQNNetwork(input_dim, output_dim)
+        self.policy_net = QnetworkClass(input_dim, output_dim)
+        self.target_net = QnetworkClass(input_dim, output_dim)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
         # Optimierer & Loss
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+        if isinstance(self.policy_net, LatticeDQNNetwork):
+            self.optimizer = optim.Adam([
+                {'params': self.policy_net.dqn.parameters(),           'lr': lr},
+                {'params': self.policy_net.c_calibrators.parameters(), 'lr': lr * 5},
+                {'params': self.policy_net.c_lattice.parameters(),     'lr': lr * 5},
+            ])
+        else:
+            self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+            
         self.loss_fn   = nn.MSELoss()
 
         # Replay Buffer
@@ -178,7 +162,7 @@ class DQNAgent:
         # Exploitation
         state_t = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
         with torch.no_grad():
-            q_values = self.policy_net(state_t)[0]
+            q_values = self.policy_net(state_t).view(-1)
 
         masked_q = self._mask_q_values(q_values, valid_actions)
         return torch.argmax(masked_q).item()
@@ -216,6 +200,10 @@ class DQNAgent:
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), self.max_grad_norm)
 
         self.optimizer.step()
+        #neu hier das apply constraint für Lattice Networks
+        if hasattr(self.policy_net, 'apply_constraints'):
+            self.policy_net.apply_constraints()
+        
 
         # Soft Update des Target-Netzes
         # θ_target = τ * θ_policy + (1 - τ) * θ_target
