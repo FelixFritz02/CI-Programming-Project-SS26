@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from collections import deque
 from lattice_dqn import LatticeDQNNetwork
+from monotonicity_evaluation import evaluate_monotonicity_systematic
 
 
 
@@ -335,9 +336,11 @@ class DQNAgent:
             if eval_monotonicity_every > 0 and (episode + 1) % eval_monotonicity_every == 0:
                 ratio = self.evaluate_monotonicity(num_pairs=monotonicity_pairs)
                 monotonicity_history.append((episode + 1, ratio))
+                mono = evaluate_monotonicity_systematic(self, self.env)
                 if verbose:
                     print(f"  → Monotonie-Check (Episode {episode + 1:>4}): "
                           f"{ratio * 100:.1f}% korrekt ({monotonicity_pairs} Paare)")
+                    print(f"  → Episode {episode+1}  Avg(50): {avg:.2f}  Monotonie: {mono:.1%}")
 
         return reward_history, monotonicity_history
 
