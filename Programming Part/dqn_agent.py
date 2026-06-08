@@ -333,14 +333,14 @@ class DQNAgent:
                       f"ε: {self.epsilon:.3f}")
 
             # Monotonie-Evaluation alle N Episoden
-            if eval_monotonicity_every > 0 and (episode + 1) % eval_monotonicity_every == 0:
+            if eval_monotonicity_every > 0 and (episode + 0) % eval_monotonicity_every == 0:
                 ratio = self.evaluate_monotonicity(num_pairs=monotonicity_pairs)
                 monotonicity_history.append((episode + 1, ratio))
-                mono = evaluate_monotonicity_systematic(self, self.env)
+                mono = evaluate_monotonicity_systematic(self, self.env, False)
                 if verbose:
                     print(f"  → Monotonie-Check (Episode {episode + 1:>4}): "
                           f"{ratio * 100:.1f}% korrekt ({monotonicity_pairs} Paare)")
-                    print(f"  → Episode {episode+1}  Avg(50): {avg:.2f}  Monotonie: {mono:.1%}")
+                    print(f" Systematic monotoncity evaluation (Episode {episode + 1}):  Monotonie: {mono:.1%}")
 
         return reward_history, monotonicity_history
 
@@ -351,101 +351,97 @@ class DQNAgent:
     def evaluate_monotonicity(self, num_pairs: int = 100) -> float:
         """
         Bewertet, wie monoton das aktuelle Q-Netz hinsichtlich der
-        Restkapazitäten ist.
+        Restkapazitäten ist – aktionsweise.
 
         Monotonie-Definition
         --------------------
-        Für zwei Zustände s und s' mit identischem (t, r, q) gilt:
-            s dominiert s'  ⟺  Ĉ_k(s) ≥ Ĉ_k(s') für alle k
-                                UND Ĉ_k(s) > Ĉ_k(s') für mind. ein k
+        Für zwei Zustände s und s' mit identischem (t, r, q) und
+        s dominiert s' (Ĉ_k(s) ≥ Ĉ_k(s') für alle k) gilt:
+            Q(s, a) ≥ Q(s', a)  für alle gemeinsam gültigen Aktionen a
 
-        Dann sollte das Q-Netz erfüllen:
-            max_a Q(s, a) ≥ max_a Q(s', a)
-
-        Mehr Restkapazität bedeutet mehr zukünftige Handlungsmöglichkeiten,
-        also kann der erreichbare kumulierte Reward nie kleiner sein.
-
-        Vorgehen
-        ---------
-        1. Sampele `num_pairs` Zustandspaare durch zufällige Episoden.
-           Jedes Paar (s, s') teilt denselben Zeitschritt t sowie
-           dieselbe Anfrage (r, q) und unterscheidet sich nur in den
-           Restkapazitäten, wobei s alle Kapazitäten von s' dominiert.
-        2. Prüfe für jedes Paar, ob max_a Q(s) ≥ max_a Q(s').
-        3. Gib den Anteil korrekt geordneter Paare zurück (0.0 – 1.0).
-
-        Parameter
-        ----------
-        num_pairs : Anzahl der zu sampelnden Zustandspaare.
+        Hinweis: Alle gültigen Aktionen von s müssen auch in s' gültig sein,
+        da s' weniger Kapazität hat. Falls das verletzt ist, wird eine
+        Warnung ausgegeben.
 
         Rückgabe
         --------
-        monotonicity_ratio : float ∈ [0, 1]
-            Anteil der Paare, bei denen das Netz korrekt monoton ist.
+        Gesamt-Ratio: Anteil korrekter (Paar × Aktion)-Kombinationen ∈ [0, 1]
         """
         K = self.env.K
-
         pairs: list[tuple[np.ndarray, np.ndarray]] = []
 
-        # Zustandspaare sammeln -------------------------------------------
-        # Strategie: Pro Episode zwei zufällig verschiedene Kapazitätsvektoren
-        # für denselben (t, r, q) konstruieren, sodass einer den anderen
-        # komponentenweise dominiert.
+        # Zustandspaare sammeln (identisch zur bisherigen Logik) --------------
         rng = np.random.default_rng()
 
         while len(pairs) < num_pairs:
             obs, _ = self.env.reset()
             done = False
+            iter = 0
 
-            while not done and len(pairs) < num_pairs:
-                # Aktueller Zeitschritt und aktuelle Anfrage aus obs
+            while not done and len(pairs) < num_pairs and iter < 10:
                 t   = obs[0]
                 r   = obs[K + 1]
                 q   = obs[K + 2:]
-                cap = obs[1 : K + 1]   # aktuelle Restkapazitäten
+                cap = obs[1 : K + 1]
 
-                # s' konstruieren: reduziere jeden Kapazitätseintrag um
-                # einen zufälligen Betrag ∈ [0, cap_k], mindestens ein
-                # Slot wird echt reduziert.
-                reductions = rng.integers(cap.astype(int)/2, cap.astype(int) + 1, size=K)
-                # Sicherstellen, dass Reduktion > 2
+                reductions = rng.integers(0, cap.astype(int) + 1, size=K)
                 if reductions.sum() > 2:
                     reductions[rng.integers(K)] = max(1, int(cap.max()))
                     reductions = np.minimum(reductions, cap.astype(int))
 
                 cap_prime = cap - reductions.astype(np.float32)
 
-                # Paare nur aufnehmen wenn cap_prime alle Werte ≥ 0 hat
                 if np.all(cap_prime >= 0) and not np.array_equal(cap, cap_prime):
                     s       = np.array([t] + list(cap)       + [r] + list(q), dtype=np.float32)
                     s_prime = np.array([t] + list(cap_prime) + [r] + list(q), dtype=np.float32)
                     pairs.append((s, s_prime))
 
-                # Zufällige gültige Aktion für nächsten Schritt
                 valid = self.env.get_valid_actions()
                 action = random.choice(valid)
                 obs, _, terminated, truncated, _ = self.env.step(action)
                 done = terminated or truncated
-        
-        # Q-Werte berechnen -----------------------------------------------
+                iter = iter + 1
+
+        # Q-Werte berechnen ---------------------------------------------------
         states       = torch.tensor(np.array([p[0] for p in pairs]), dtype=torch.float32)
         states_prime = torch.tensor(np.array([p[1] for p in pairs]), dtype=torch.float32)
 
         self.policy_net.eval()
         with torch.no_grad():
-            q_raw_s       = self.policy_net(states)         # (num_pairs, A)
-            q_raw_s_prime = self.policy_net(states_prime)   # (num_pairs, A)
-
-            q_masked_s       = self._batch_mask_q_values(q_raw_s,       [p[0].tolist() for p in pairs])
-            q_masked_s_prime = self._batch_mask_q_values(q_raw_s_prime, [p[1].tolist() for p in pairs])
-
-            q_s       = q_masked_s.max(dim=1).values
-            q_s_prime = q_masked_s_prime.max(dim=1).values
+            q_s       = self.policy_net(states)        # (num_pairs, A)
+            q_s_prime = self.policy_net(states_prime)  # (num_pairs, A)
         self.policy_net.train()
 
-        correct = (q_s >= q_s_prime).float().mean().item()
+        # Aktionsweiser Vergleich ---------------------------------------------
+        total_checks  = 0
+        total_correct = 0
 
-        return correct
+        for i, (s, s_prime) in enumerate(pairs):
+            valid_s       = set(self.env._get_valid_actions(s))
+            valid_s_prime = set(self.env._get_valid_actions(s_prime))
+
+            # Konsistenzcheck: alle Aktionen von s müssen in s' gültig sein
+            if not valid_s_prime.issubset(valid_s):
+                extra = valid_s - valid_s_prime
+                print(f"[WARNUNG] Paar {i}: Aktionen {extra} in s gültig, "
+                    f"aber nicht in s' – Umgebungslogik prüfen!")
+
+            # Nur gemeinsam gültige Aktionen vergleichen
+            common_actions = sorted(valid_s & valid_s_prime)
+
+            for a in common_actions:
+                total_checks += 1
+                if q_s[i, a].item() >= q_s_prime[i, a].item():
+                    total_correct += 1
+                    #print(f's: {s}, s_prime: {s_prime}')
+                    #print(f'Valid actions: {common_actions}')
+                    #print(f'Q value action {a} in s: {q_s[i, a].item():.4f}, in s_prime: {q_s_prime[i, a].item():.4f}')
+                #else:
+                    #print(f's: {s}, s_prime: {s_prime}')
+                    #print(f'Valid actions: {common_actions}')
+                    #print(f'Q value action {a} in s: {q_s[i, a].item():.4f}, in s_prime: {q_s_prime[i, a].item():.4f}')
+
+        return total_correct / total_checks if total_checks > 0 else 0.0
 
     def save(self, path: str):
         """Speichert die Gewichte des Policy-Netzes."""
