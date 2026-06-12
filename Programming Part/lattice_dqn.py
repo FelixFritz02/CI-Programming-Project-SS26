@@ -70,7 +70,7 @@ class LatticeDQNNetwork(nn.Module):
         self.c_calibrators = nn.ModuleList([
             NumericalCalibrator(
                 input_keypoints=np.linspace(c_range[0], c_range[1], keypoints),
-                monotonicity=Monotonicity.INCREASING,
+                monotonicity=Monotonicity.DECREASING,  # mehr Kapazität → besserer Zustand
                 output_min=0.0,
                 output_max=1.0,
             )

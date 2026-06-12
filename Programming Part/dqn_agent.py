@@ -271,7 +271,7 @@ class DQNAgent:
         self,
         num_episodes: int = 500,
         verbose: bool = True,
-        eval_monotonicity_every: int = 50,
+        eval_monotonicity_every: int = 1,
         monotonicity_pairs: int = 100,
     ) -> tuple:
         """
@@ -318,7 +318,9 @@ class DQNAgent:
 
                 # 4. Trainieren (nur wenn genug Daten vorhanden)
                 if len(self.buffer) >= self.warmup_steps and self._step % self.train_every == 0:
+                    print("Ich trainiere...")
                     self._train_step()
+                    
 
             # Epsilon reduzieren
             self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
@@ -335,15 +337,16 @@ class DQNAgent:
             # Monotonie-Evaluation alle N Episoden
             if eval_monotonicity_every > 0 and (episode + 0) % eval_monotonicity_every == 0:
                 ratio = self.evaluate_monotonicity(num_pairs=monotonicity_pairs)
-                monotonicity_history.append((episode + 1, ratio))
-                mono = evaluate_monotonicity_systematic(self, self.env, False)
+                mono_c, mono_t, mono_r = evaluate_monotonicity_systematic(self, self.env, False)
+                monotonicity_history.append((episode + 1, ratio, mono_c, mono_t, mono_r))
                 if verbose:
                     print(f"  → Monotonie-Check (Episode {episode + 1:>4}): "
                           f"{ratio * 100:.1f}% korrekt ({monotonicity_pairs} Paare)")
-                    print(f" Systematic monotoncity evaluation (Episode {episode + 1}):  Monotonie: {mono:.1%}")
+                    print(f"  Systematic monotonicity (Episode {episode + 1}): "
+                          f"C_k: {mono_c:.1%}, t: {mono_t:.1%}, r: {mono_r:.1%}")
+                    
 
         return reward_history, monotonicity_history
-
     # ------------------------------------------------------------------
     # Monotonie-Evaluation
     # ------------------------------------------------------------------
