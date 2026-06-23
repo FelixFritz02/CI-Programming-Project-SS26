@@ -318,7 +318,6 @@ class DQNAgent:
 
                 # 4. Trainieren (nur wenn genug Daten vorhanden)
                 if len(self.buffer) >= self.warmup_steps and self._step % self.train_every == 0:
-                    print("Ich trainiere...")
                     self._train_step()
                     
 
