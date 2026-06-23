@@ -94,12 +94,13 @@ class DrauspEnv(gym.Env):
     # ------------------------------------------------------------------
 
     def _length_of_request(self, state):
-        """Gibt die Länge (Anzahl belegter Slots) der aktuellen Anfrage zurück."""
-        q = state[self.K + 2:]          # q-Vektor beginnt bei Index K+2
+        """Länge der Anfrage = letzter Nicht-Null-Index + 1"""
+        q = state[self.K + 2:]
+        last_nonzero = -1
         for i, val in enumerate(q):
-            if val == 0:
-                return i
-        return len(q)
+            if val != 0:
+                last_nonzero = i
+        return last_nonzero + 1 if last_nonzero >= 0 else 0
 
     def _get_valid_actions(self, state):
         """Gibt eine Liste aller gültigen Aktionen zurück."""
