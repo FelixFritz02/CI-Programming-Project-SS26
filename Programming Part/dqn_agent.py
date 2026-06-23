@@ -336,115 +336,15 @@ class DQNAgent:
 
             # Monotonie-Evaluation alle N Episoden
             if eval_monotonicity_every > 0 and (episode + 0) % eval_monotonicity_every == 0:
-                ratio = self.evaluate_monotonicity(num_pairs=monotonicity_pairs)
-                mono_c, mono_t, mono_r = evaluate_monotonicity_systematic(self, self.env, False)
-                monotonicity_history.append((episode + 1, ratio, mono_c, mono_t, mono_r))
+                mono_c, mono_t, mono_r, mono_q, mono_mixed = evaluate_monotonicity_systematic(self, self.env, False)
+                monotonicity_history.append((episode + 1,  mono_c, mono_t, mono_r, mono_q, mono_mixed))
                 if verbose:
-                    print(f"  → Monotonie-Check (Episode {episode + 1:>4}): "
-                          f"{ratio * 100:.1f}% korrekt ({monotonicity_pairs} Paare)")
                     print(f"  Systematic monotonicity (Episode {episode + 1}): "
-                          f"C_k: {mono_c:.1%}, t: {mono_t:.1%}, r: {mono_r:.1%}")
+                          f"C_k: {mono_c:.1%}, t: {mono_t:.1%}, r: {mono_r:.1%}, q: {mono_q:.1%}, mixed: {mono_mixed:.1%}")
                     
 
         return reward_history, monotonicity_history
-    # ------------------------------------------------------------------
-    # Monotonie-Evaluation
-    # ------------------------------------------------------------------
 
-    def evaluate_monotonicity(self, num_pairs: int = 100) -> float:
-        """
-        Bewertet, wie monoton das aktuelle Q-Netz hinsichtlich der
-        Restkapazitäten ist – aktionsweise.
-
-        Monotonie-Definition
-        --------------------
-        Für zwei Zustände s und s' mit identischem (t, r, q) und
-        s dominiert s' (Ĉ_k(s) ≥ Ĉ_k(s') für alle k) gilt:
-            Q(s, a) ≥ Q(s', a)  für alle gemeinsam gültigen Aktionen a
-
-        Hinweis: Alle gültigen Aktionen von s müssen auch in s' gültig sein,
-        da s' weniger Kapazität hat. Falls das verletzt ist, wird eine
-        Warnung ausgegeben.
-
-        Rückgabe
-        --------
-        Gesamt-Ratio: Anteil korrekter (Paar × Aktion)-Kombinationen ∈ [0, 1]
-        """
-        K = self.env.K
-        pairs: list[tuple[np.ndarray, np.ndarray]] = []
-
-        # Zustandspaare sammeln (identisch zur bisherigen Logik) --------------
-        rng = np.random.default_rng()
-
-        while len(pairs) < num_pairs:
-            obs, _ = self.env.reset()
-            done = False
-            iter = 0
-
-            while not done and len(pairs) < num_pairs and iter < 10:
-                t   = obs[0]
-                r   = obs[K + 1]
-                q   = obs[K + 2:]
-                cap = obs[1 : K + 1]
-
-                reductions = rng.integers(0, cap.astype(int) + 1, size=K)
-                if reductions.sum() > 2:
-                    reductions[rng.integers(K)] = max(1, int(cap.max()))
-                    reductions = np.minimum(reductions, cap.astype(int))
-
-                cap_prime = cap - reductions.astype(np.float32)
-
-                if np.all(cap_prime >= 0) and not np.array_equal(cap, cap_prime):
-                    s       = np.array([t] + list(cap)       + [r] + list(q), dtype=np.float32)
-                    s_prime = np.array([t] + list(cap_prime) + [r] + list(q), dtype=np.float32)
-                    pairs.append((s, s_prime))
-
-                valid = self.env.get_valid_actions()
-                action = random.choice(valid)
-                obs, _, terminated, truncated, _ = self.env.step(action)
-                done = terminated or truncated
-                iter = iter + 1
-
-        # Q-Werte berechnen ---------------------------------------------------
-        states       = torch.tensor(np.array([p[0] for p in pairs]), dtype=torch.float32)
-        states_prime = torch.tensor(np.array([p[1] for p in pairs]), dtype=torch.float32)
-
-        self.policy_net.eval()
-        with torch.no_grad():
-            q_s       = self.policy_net(states)        # (num_pairs, A)
-            q_s_prime = self.policy_net(states_prime)  # (num_pairs, A)
-        self.policy_net.train()
-
-        # Aktionsweiser Vergleich ---------------------------------------------
-        total_checks  = 0
-        total_correct = 0
-
-        for i, (s, s_prime) in enumerate(pairs):
-            valid_s       = set(self.env._get_valid_actions(s))
-            valid_s_prime = set(self.env._get_valid_actions(s_prime))
-
-            # Konsistenzcheck: alle Aktionen von s müssen in s' gültig sein
-            if not valid_s_prime.issubset(valid_s):
-                extra = valid_s - valid_s_prime
-                print(f"[WARNUNG] Paar {i}: Aktionen {extra} in s gültig, "
-                    f"aber nicht in s' – Umgebungslogik prüfen!")
-
-            # Nur gemeinsam gültige Aktionen vergleichen
-            common_actions = sorted(valid_s & valid_s_prime)
-
-            for a in common_actions:
-                total_checks += 1
-                if q_s[i, a].item() >= q_s_prime[i, a].item():
-                    total_correct += 1
-                    #print(f's: {s}, s_prime: {s_prime}')
-                    #print(f'Valid actions: {common_actions}')
-                    #print(f'Q value action {a} in s: {q_s[i, a].item():.4f}, in s_prime: {q_s_prime[i, a].item():.4f}')
-                #else:
-                    #print(f's: {s}, s_prime: {s_prime}')
-                    #print(f'Valid actions: {common_actions}')
-                    #print(f'Q value action {a} in s: {q_s[i, a].item():.4f}, in s_prime: {q_s_prime[i, a].item():.4f}')
-
-        return total_correct / total_checks if total_checks > 0 else 0.0
 
     def save(self, path: str):
         """Speichert die Gewichte des Policy-Netzes."""
