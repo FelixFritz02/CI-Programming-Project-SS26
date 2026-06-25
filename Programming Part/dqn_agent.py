@@ -6,7 +6,7 @@ import torch.optim as optim
 from collections import deque
 from lattice_dqn import LatticeDQNNetwork
 from monotonicity_evaluation import evaluate_monotonicity_systematic
-
+from full_lattice import FullLatticeNetwork
 
 
 # -----------------------------------------------------------------------
@@ -115,6 +115,17 @@ class DQNAgent:
                 {'params': self.policy_net.dqn.parameters(),           'lr': lr},
                 {'params': self.policy_net.c_calibrators.parameters(), 'lr': lr * 5},
                 {'params': self.policy_net.c_lattice.parameters(),     'lr': lr * 5},
+            ])
+        elif isinstance(self.policy_net, FullLatticeNetwork):
+            self.optimizer = optim.Adam([
+                {'params': self.policy_net.cal_t.parameters(),      'lr': lr * 5},
+                {'params': self.policy_net.cal_r.parameters(),      'lr': lr * 5},
+                {'params': self.policy_net.cal_c.parameters(),      'lr': lr * 5},
+                {'params': self.policy_net.cal_q.parameters(),      'lr': lr * 5},
+                {'params': self.policy_net.lattices_A.parameters(), 'lr': lr * 5},
+                {'params': self.policy_net.lattices_B.parameters(),'lr': lr * 5},
+                {'params': self.policy_net.lattices_C.parameters(), 'lr': lr * 5},
+                {'params': self.policy_net.output_layer.parameters(), 'lr': lr},
             ])
         else:
             self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
