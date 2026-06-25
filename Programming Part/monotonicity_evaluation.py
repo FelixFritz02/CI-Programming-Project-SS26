@@ -88,7 +88,7 @@ def evaluate_monotonicity_systematic(agent, env, compare_q_values: bool = False)
         return correct[valid_mask].float().mean().item()
 
     score_c = _score(pairs_c, geq=True)
-    score_t = _score(pairs_t, geq=False)  # Richtung anpassen je nach Semantik von t! --> müsste hier nicht geq = True sein? (t+1 -> Q sollte kleiner sein als bei t)
+    score_t = _score(pairs_t, geq=True)  # Richtung anpassen je nach Semantik von t! 
     score_r = _score(pairs_r, geq=False)  # r+1 -> Q sollte nicht kleiner sein als bei r (Richtung ggf. anpassen!)
     score_q = _score(pairs_q, geq=False)  
     score_mixed = _score(pairs_mixed, geq=False)  
