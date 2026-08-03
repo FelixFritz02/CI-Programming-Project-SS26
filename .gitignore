@@ -75,6 +75,7 @@ _minted*/
 
 # macOS
 .DS_Store
+__MACOSX/
 
 # Windows
 Thumbs.db
