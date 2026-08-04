@@ -62,7 +62,14 @@ class DQNAgent:
     gamma        : Diskontierungsfaktor
     epsilon_start: Startwert für Epsilon (Exploration)
     epsilon_min  : Minimalwert für Epsilon
-    epsilon_decay: Multiplikativer Abfall pro Episode
+    epsilon_decay_steps: Anzahl Umgebungsschritte (nicht Episoden!), über die
+                   Epsilon exponentiell von epsilon_start auf epsilon_min
+                   abklingt. Schrittbasiert statt episodenbasiert, damit die
+                   Exploration nicht künstlich schnell abklingt, wenn
+                   Episoden (z.B. durch frühen Kapazitäts-Abbruch) kurz sind.
+    reject_bias  : Wahrscheinlichkeit, während Exploration Ablehnen (Aktion 0)
+                   statt einer zufälligen Accept-Aktion zu wählen (0.0 = wie
+                   bisher uniform über alle gültigen Aktionen).
     batch_size   : Anzahl Samples pro Trainingsschritt
     buffer_size  : Maximale Größe des Replay Buffers
     train_every  : Trainingsschritt alle N Umgebungsschritte
@@ -79,7 +86,8 @@ class DQNAgent:
         gamma: float = 0.9,
         epsilon_start: float = 1.0,
         epsilon_min: float = 0.1,
-        epsilon_decay: float = 0.995,
+        epsilon_decay_steps: int = 20_000,
+        reject_bias: float = 0.5,
         batch_size: int = 64,
         buffer_size: int = 50_000,
         train_every: int = 4,
@@ -92,9 +100,11 @@ class DQNAgent:
     ):
         self.env = env
         self.gamma = gamma
+        self.epsilon_start = epsilon_start
         self.epsilon = epsilon_start
         self.epsilon_min = epsilon_min
-        self.epsilon_decay = epsilon_decay
+        self.epsilon_decay_steps = epsilon_decay_steps
+        self.reject_bias = reject_bias
         self.batch_size = batch_size
         self.train_every = train_every
         self.warmup_steps = warmup_steps
@@ -179,6 +189,16 @@ class DQNAgent:
         return q_batch + mask
 
     # ------------------------------------------------------------------
+    # Epsilon-Schedule (schrittbasiert)
+    # ------------------------------------------------------------------
+
+    def _decay_epsilon(self):
+        """Exponentieller Abfall von epsilon_start auf epsilon_min über epsilon_decay_steps Umgebungsschritte."""
+        self.epsilon = self.epsilon_min + (self.epsilon_start - self.epsilon_min) * np.exp(
+            -self._step / self.epsilon_decay_steps
+        )
+
+    # ------------------------------------------------------------------
     # Aktionsauswahl (Epsilon-Greedy mit Action Masking)
     # ------------------------------------------------------------------
 
@@ -187,7 +207,14 @@ class DQNAgent:
 
         # Exploration
         if random.random() < self.epsilon:
-            return random.choice(valid_actions)
+            # Ablehnen wird mit reject_bias bevorzugt (statt uniform über alle
+            # gültigen Aktionen), damit zufällige Exploration die Kapazität
+            # nicht sofort verbraucht und Episoden auch tiefer in die Instanz
+            # kommen.
+            accept_actions = [a for a in valid_actions if a != 0]
+            if accept_actions and random.random() >= self.reject_bias:
+                return random.choice(accept_actions)
+            return 0
 
         # Exploitation
         state_t = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
@@ -339,13 +366,13 @@ class DQNAgent:
                 cumulated_reward += reward
                 self._step += 1
 
-                # 4. Trainieren (nur wenn genug Daten vorhanden)
+                # 4. Epsilon reduzieren (schrittbasiert, nicht episodenbasiert)
+                self._decay_epsilon()
+
+                # 5. Trainieren (nur wenn genug Daten vorhanden)
                 if len(self.buffer) >= self.warmup_steps and self._step % self.train_every == 0:
                     self._train_step()
-                    
 
-            # Epsilon reduzieren
-            self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
 
             reward_history.append(cumulated_reward)
 
@@ -387,7 +414,7 @@ if __name__ == "__main__":
     from env.gymnasium_env import DrauspEnv
 
     env = DrauspEnv(K=5, T_d=20, C_k=[20] * 5)
-    agent = DQNAgent(env, lr=1e-3, gamma=0.9, epsilon_decay=0.995)
+    agent = DQNAgent(env, lr=1e-3, gamma=0.9, epsilon_decay_steps=5_000)
 
     reward_history, monotonicity_history = agent.train(num_episodes=500)
 
