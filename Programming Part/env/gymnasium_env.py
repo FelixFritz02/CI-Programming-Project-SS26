@@ -1,11 +1,15 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # "Programming Part" auf sys.path (für env./models./training.-Importe)
+
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 from typing import Optional
 
 # Importiere deine bestehenden Module
-from instance_generator import instance_generator
-from instance_reader import get_instance_data
+from env.instance_generator import instance_generator
+from env.instance_reader import get_instance_data
 
 
 class DrauspEnv(gym.Env):

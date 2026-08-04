@@ -5,7 +5,7 @@ from pytorch_lattice.layers import NumericalCalibrator, Lattice
 from pytorch_lattice.enums import Monotonicity, Interpolation
 
 
-class LatticeDQNNetwork(nn.Module):
+class LatticeDQNNetworkWithAction(nn.Module):
     """
     DQN + aktionsabhängiges monotones Lattice.
 

@@ -7,7 +7,7 @@ from typing import Union, Sequence, List
 import numpy as np
 
 MODULE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = MODULE_DIR.parent
+PROJECT_ROOT = MODULE_DIR.parent.parent
 
 
 @dataclass

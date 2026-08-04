@@ -1,12 +1,17 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # "Programming Part" auf sys.path (für env./models./training.-Importe)
+
 import random
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
-from lattice_dqn import LatticeDQNNetwork
-from monotonicity_evaluation import evaluate_monotonicity_systematic
-from full_lattice import FullLatticeNetwork
+from models.lattice_dqn import LatticeDQNNetwork
+from models.lattice_dqn_withaction import LatticeDQNNetworkWithAction
+from training.monotonicity_evaluation import evaluate_monotonicity_systematic
+from models.full_lattice import FullLatticeNetwork
 
 
 # -----------------------------------------------------------------------
@@ -115,6 +120,13 @@ class DQNAgent:
                 {'params': self.policy_net.dqn.parameters(),           'lr': lr},
                 {'params': self.policy_net.c_calibrators.parameters(), 'lr': lr * 5},
                 {'params': self.policy_net.c_lattice.parameters(),     'lr': lr * 5},
+            ])
+        elif isinstance(self.policy_net, LatticeDQNNetworkWithAction):
+            self.optimizer = optim.Adam([
+                {'params': self.policy_net.dqn.parameters(),           'lr': lr},
+                {'params': self.policy_net.c_calibrators.parameters(), 'lr': lr * 5},
+                {'params': self.policy_net.c_lattice.parameters(),     'lr': lr * 5},
+                {'params': self.policy_net.action_calibrator.parameters(), 'lr': lr * 5},
             ])
         elif isinstance(self.policy_net, FullLatticeNetwork):
             self.optimizer = optim.Adam([
@@ -282,7 +294,7 @@ class DQNAgent:
         self,
         num_episodes: int = 500,
         verbose: bool = True,
-        eval_monotonicity_every: int = 1,
+        eval_monotonicity_every: int = 50,
         monotonicity_pairs: int = 100,
     ) -> tuple:
         """
@@ -372,7 +384,7 @@ class DQNAgent:
 # Schnelltest
 # -----------------------------------------------------------------------
 if __name__ == "__main__":
-    from gymnasium_env import DrauspEnv
+    from env.gymnasium_env import DrauspEnv
 
     env = DrauspEnv(K=5, T_d=20, C_k=[20] * 5)
     agent = DQNAgent(env, lr=1e-3, gamma=0.9, epsilon_decay=0.995)
