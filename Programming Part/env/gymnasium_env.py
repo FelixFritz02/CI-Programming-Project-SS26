@@ -53,6 +53,7 @@ class DrauspEnv(gym.Env):
         self.T_d = T_d
         self.lam = lam
         self.render_mode = render_mode
+        self.fixed_request_length = fixed_request_length
 
         # Kapazitätsvektor
         self.C_k = C_k if C_k is not None else [20] * K
@@ -98,7 +99,9 @@ class DrauspEnv(gym.Env):
     # ------------------------------------------------------------------
 
     def _length_of_request(self, state):
-        """Länge der Anfrage = letzter Nicht-Null-Index + 1"""
+        if self.fixed_request_length is not None:
+            return self.fixed_request_length
+
         q = state[self.K + 2:]
         last_nonzero = -1
         for i, val in enumerate(q):
@@ -124,6 +127,23 @@ class DrauspEnv(gym.Env):
     def _build_state(self, t, capacities, request):
         """Baut den Zustandsvektor auf."""
         return [t] + list(capacities) + [request[0]] + list(request[1:self.K + 1])
+
+    def _has_feasible_window(self, capacities) -> bool:
+        """
+        Prüft, ob noch ein zusammenhängendes Fenster von `fixed_request_length`
+        Slots mit Restkapazität > 0 existiert (bei variabler Länge: length=1,
+        da ein Request dann bereits einen einzelnen Slot belegen kann).
+
+        Da Kapazitäten nie wieder steigen, kann die Episode sicher beendet
+        werden, sobald kein solches Fenster mehr existiert: der Rest der
+        Episode liefert dann garantiert nur noch Reward 0 (Ablehnen).
+        """
+        length = self.fixed_request_length if self.fixed_request_length is not None else 1
+        K = self.K
+        return any(
+            all(c > 0 for c in capacities[start:start + length])
+            for start in range(K - length + 1)
+        )
 
     # ------------------------------------------------------------------
     # Gymnasium-Interface
@@ -209,7 +229,16 @@ class DrauspEnv(gym.Env):
             next_req = self._instance[self._t - 1]
             self._state = self._build_state(self._t, self._capacities, next_req)
             obs = np.array(self._state, dtype=np.float32)
-            info = {"valid_actions": self._get_valid_actions(self._state)}
+
+            if self._has_feasible_window(self._capacities):
+                info = {"valid_actions": self._get_valid_actions(self._state)}
+            else:
+                # Keine Anfrage kann ab jetzt noch angenommen werden
+                # -> Rest der Episode liefert garantiert nur noch Reward 0,
+                #    Buffer wird nicht mit nutzlosen "Ablehnen"-Schritten geflutet
+                terminated = True
+                info = {"valid_actions": [0]}
+                print('Keine zusammenhängende Kapazität mehr verfügbar. Episode wird beendet bei Zeitschritt.', self._t)
 
         return obs, reward, terminated, truncated, info
 
