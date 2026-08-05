@@ -238,7 +238,7 @@ class DrauspEnv(gym.Env):
                 #    Buffer wird nicht mit nutzlosen "Ablehnen"-Schritten geflutet
                 terminated = True
                 info = {"valid_actions": [0]}
-                print('Keine zusammenhängende Kapazität mehr verfügbar. Episode wird beendet bei Zeitschritt.', self._t)
+                #print('Keine zusammenhängende Kapazität mehr verfügbar. Episode wird beendet bei Zeitschritt.', self._t)
 
         return obs, reward, terminated, truncated, info
 

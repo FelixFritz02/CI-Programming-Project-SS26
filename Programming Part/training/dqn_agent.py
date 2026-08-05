@@ -341,14 +341,19 @@ class DQNAgent:
         --------
         reward_history      : kumulierter Reward je Episode
         monotonicity_history: Liste von (episode, ratio)-Tupeln
+        depth_history       : Liste von (episode, erreichte_tiefe, epsilon)-Tupeln;
+                               erreichte_tiefe = Anzahl Umgebungsschritte, bevor
+                               die Episode terminiert/truncated wurde
         """
         reward_history: list = []
         monotonicity_history: list = []
+        depth_history: list = []
 
         for episode in range(num_episodes):
             obs, _ = self.env.reset()
             done = False
             cumulated_reward = 0.0
+            episode_depth = 0
 
             while not done:
                 # 1. Aktion wählen
@@ -364,6 +369,7 @@ class DQNAgent:
 
                 obs = next_obs
                 cumulated_reward += reward
+                episode_depth += 1
                 self._step += 1
 
                 # 4. Epsilon reduzieren (schrittbasiert, nicht episodenbasiert)
@@ -375,12 +381,16 @@ class DQNAgent:
 
 
             reward_history.append(cumulated_reward)
+            depth_history.append((episode + 1, episode_depth, self.epsilon))
 
             if verbose and (episode + 1) % 50 == 0:
                 avg = np.mean(reward_history[-50:])
+                avg_depth = np.mean([d for _, d, _ in depth_history[-50:]])
                 print(f"Episode {episode + 1:>4}/{num_episodes}  "
                       f"Reward: {cumulated_reward:>8.2f}  "
                       f"Avg(50): {avg:>8.2f}  "
+                      f"Tiefe: {episode_depth:>4}  "
+                      f"Avg-Tiefe(50): {avg_depth:>6.1f}  "
                       f"ε: {self.epsilon:.3f}")
 
             # Monotonie-Evaluation alle N Episoden
@@ -392,7 +402,7 @@ class DQNAgent:
                           f"C_k: {mono_c:.1%}, t: {mono_t:.1%}, r: {mono_r:.1%}, q: {mono_q:.1%}, mixed: {mono_mixed:.1%}")
                     
 
-        return reward_history, monotonicity_history
+        return reward_history, monotonicity_history, depth_history
 
 
     def save(self, path: str):
@@ -416,7 +426,7 @@ if __name__ == "__main__":
     env = DrauspEnv(K=5, T_d=20, C_k=[20] * 5)
     agent = DQNAgent(env, lr=1e-3, gamma=0.9, epsilon_decay_steps=5_000)
 
-    reward_history, monotonicity_history = agent.train(num_episodes=500)
+    reward_history, monotonicity_history, depth_history = agent.train(num_episodes=500)
 
     print(f"\nBestes Ergebnis:       {max(reward_history):.2f}")
     print(f"Durchschnitt (letzte 50): {np.mean(reward_history[-50:]):.2f}")

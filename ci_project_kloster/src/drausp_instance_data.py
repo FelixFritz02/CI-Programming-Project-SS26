@@ -224,7 +224,7 @@ def random_policy_rollout_batched(
 
 if __name__ == "__main__":
     instance_data = get_instance_data(
-        PROJECT_ROOT / "instances" / "wendtris" / "S-wendtris12D.txt",
+        PROJECT_ROOT / "instances" / "lion18s" / "SC01.txt",
         20,
         include_reject_moves=True,
     )
