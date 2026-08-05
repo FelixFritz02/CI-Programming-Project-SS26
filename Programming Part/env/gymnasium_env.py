@@ -24,6 +24,11 @@ class DrauspEnv(gym.Env):
         - r:   Erlös der aktuellen Anfrage
         - q_k: benötigte Kapazität der aktuellen Anfrage in Slot k
 
+    `instance`: Anfragen-Pool (z.B. aus instance_reader), aus dem bei jedem reset()
+    T_d Anfragen unabhängig und mit Zurücklegen gezogen werden (wie im DRAUSP-Paper
+    und in der Referenzimplementierung ci_project_kloster/src/drausp_env.py) — keine
+    feste, deterministisch durchlaufene Sequenz.
+
     Aktionsraum:
         {0, 1, ..., K}
         - 0:   Anfrage ablehnen
@@ -43,7 +48,7 @@ class DrauspEnv(gym.Env):
         T_d: int = 20,
         C_k: Optional[list] = None,
         lam: float = 1.0,
-        instance=None,          # Feste Instanz (z.B. aus instance_reader)
+        instance=None,          # Anfragen-Pool (z.B. aus instance_reader)
         render_mode: Optional[str] = None,
         fixed_request_length: int = None
     ):
@@ -153,9 +158,11 @@ class DrauspEnv(gym.Env):
         """setzt environment wieder in Anfangszustand"""
         super().reset(seed=seed)
 
-        # Neue oder feste Instanz laden
+        # Neue Episoden-Sequenz laden: bei einem Pool T_d Anfragen mit Zurücklegen
+        # ziehen (wie im Paper), sonst synthetisch frisch T_d Anfragen erzeugen.
         if self._fixed_instance is not None:
-            self._instance = self._fixed_instance
+            idx = self.np_random.integers(0, len(self._fixed_instance), size=self.T_d)
+            self._instance = [self._fixed_instance[i] for i in idx]
         else:
             self._instance = instance_generator(self.T_d, self.K, self.lam)
         

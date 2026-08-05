@@ -17,7 +17,9 @@ def evaluate_monotonicity_systematic(agent, env, compare_q_values: bool = False)
     """
     K        = env.K
     C_max    = max(env.C_k)
-    instance = env._fixed_instance
+    # Die zuletzt gezogene Episoden-Sequenz (nicht der rohe Pool) - env._instance ist
+    # nach jedem reset() gesetzt, unabhängig davon ob mit oder ohne festen Pool trainiert wird.
+    instance = env._instance
 
     pairs_c = []
     pairs_t = []

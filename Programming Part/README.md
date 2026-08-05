@@ -27,9 +27,22 @@
 
 - Gamma (Diskontierungsfaktor) erhöht --> läuft damit viel besser (Zukunft spielt größere Rolle --> späteres Annehmen, tief in der Instanz, wird wichtiger)
 
+- **`T_d` und Pool-Größe `|N|` waren verwechselt — jetzt sauber getrennt.** Beim Laden einer
+  Benchmark-Instanz (`instance_reader.get_instance_data`) ist `instance` jetzt ein **Pool** von
+  `|N|` Kandidaten-Anfragen (Feld umbenannt: `DrauspInstanceData.num_requests` →
+  `DrauspInstanceData.pool_size`), aus dem `DrauspEnv.reset()` pro Episode `T_d` Anfragen
+  **zufällig mit Zurücklegen** zieht — wie im Paper (`drausp_lion18.pdf`) und in der gegebenen
+  Referenzimplementierung (`ci_project_kloster/src/drausp_env.py`) beschrieben, statt die Datei
+  einmal deterministisch von vorne durchzulaufen. `T_d` ist jetzt ein frei wählbarer Parameter
+  (vorher fälschlich = Zeilenzahl der Datei) und muss beim Environment-Aufbau explizit gesetzt
+  werden (siehe Notebooks: `T_d = 10` mit Kommentar, welche Paper-Instanz das entspricht). Auch
+  `training/monotonicity_evaluation.py` testet jetzt gegen die zuletzt gezogene
+  Episoden-Sequenz (`env._instance`) statt gegen den rohen Pool (`env._fixed_instance`) — behebt
+  nebenbei einen Crash beim Training ohne festen Pool.
+
 ## Offene Baustellen
 
-- Kloster nach Benchmarks für Instanzen fragen
+- Kloster nach Benchmarks für Instanzen fragen --> sind im Paper!!
 - Monotonie-Test überprüfen, testet aktuell nur mit deterministischen C_k-Werten
 - Monotonie-Fehlerterm:
     - dynamisches Mono-Lambda setzen

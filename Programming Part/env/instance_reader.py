@@ -13,7 +13,7 @@ PROJECT_ROOT = MODULE_DIR.parent.parent
 @dataclass
 class DrauspInstanceData:
     num_slots: int
-    num_requests: int
+    pool_size: int  # Anzahl Kandidaten-Anfragen im Pool (|N| im Paper) - NICHT T_d!
     capacity_vector: list[int]
     instance: list
     request_length: int
@@ -25,14 +25,14 @@ def get_instance_data(data_path: Union[str, Path]):
         requests = np.loadtxt(file, dtype=np.int32)
 
     num_slots = len(capacity_vector)
-    num_requests = len(requests)
+    pool_size = len(requests)
     request_length = requests.shape[1]
     instance = []
     for i, request in enumerate(requests):
         row = [int(revenues[i])] + [int(x) for x in request] + [0] * (num_slots - len(request))
         instance.append(row)
     #print(instance)
-    return(DrauspInstanceData(num_slots, num_requests, capacity_vector, instance, request_length))
+    return(DrauspInstanceData(num_slots, pool_size, capacity_vector, instance, request_length))
 
 
 if __name__ == "__main__":
