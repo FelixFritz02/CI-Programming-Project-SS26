@@ -39,6 +39,7 @@ htmlcov/
 # ========================
 # Compiled output
 *.pdf
+!Literatur/*.pdf
 *.dvi
 *.ps
 
