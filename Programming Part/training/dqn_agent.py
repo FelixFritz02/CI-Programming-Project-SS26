@@ -8,10 +8,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
-from models.lattice_dqn import LatticeDQNNetwork
-from models.lattice_dqn_withaction import LatticeDQNNetworkWithAction
+from models.combine_lattice_dqn import LatticeDQNNetwork
+from models.combine_lattice_dqn_withaction import LatticeDQNNetworkWithAction
 from training.monotonicity_evaluation import evaluate_monotonicity_systematic
 from models.full_lattice import FullLatticeNetwork
+from models.deep_lattice import DeepLatticeNetwork
 
 
 # -----------------------------------------------------------------------
@@ -137,6 +138,19 @@ class DQNAgent:
                 {'params': self.policy_net.c_calibrators.parameters(), 'lr': lr * 5},
                 {'params': self.policy_net.c_lattice.parameters(),     'lr': lr * 5},
                 {'params': self.policy_net.action_calibrator.parameters(), 'lr': lr * 5},
+            ])
+        elif isinstance(self.policy_net, DeepLatticeNetwork):
+            self.optimizer = optim.Adam([
+                {'params': self.policy_net.cal_t.parameters(),        'lr': lr * 5},
+                {'params': self.policy_net.cal_r.parameters(),        'lr': lr * 5},
+                {'params': self.policy_net.cal_c.parameters(),        'lr': lr * 5},
+                {'params': self.policy_net.cal_q.parameters(),        'lr': lr * 5},
+                {'params': self.policy_net.lattices_A.parameters(),   'lr': lr * 5},
+                {'params': self.policy_net.lattices_B.parameters(),   'lr': lr * 5},
+                {'params': self.policy_net.lattices_C.parameters(),   'lr': lr * 5},
+                {'params': self.policy_net.cal_between.parameters(),  'lr': lr * 5},
+                {'params': self.policy_net.lattices_L2.parameters(),  'lr': lr * 5},
+                {'params': self.policy_net.output_layer.parameters(), 'lr': lr},
             ])
         elif isinstance(self.policy_net, FullLatticeNetwork):
             self.optimizer = optim.Adam([
