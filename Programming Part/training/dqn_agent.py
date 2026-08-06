@@ -409,7 +409,7 @@ class DQNAgent:
 
             # Monotonie-Evaluation alle N Episoden
             if eval_monotonicity_every > 0 and (episode + 0) % eval_monotonicity_every == 0:
-                mono_c, mono_t, mono_r, mono_q, mono_mixed = evaluate_monotonicity_systematic(self, self.env, False)
+                mono_c, mono_t, mono_r, mono_q, mono_mixed = evaluate_monotonicity_systematic(self, self.env)
                 monotonicity_history.append((episode + 1,  mono_c, mono_t, mono_r, mono_q, mono_mixed))
                 if verbose:
                     print(f"  Systematic monotonicity (Episode {episode + 1}): "
