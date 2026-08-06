@@ -48,6 +48,7 @@
     - dynamisches Mono-Lambda setzen
     - Erweiterung auf t,q und r (Fehlerterm wird bislang nur bei Verletzung der Monotonie in C_k ergänzt)
 - Full-Lattice Netzwerk weiterentwickeln
+    -> Vektorisieren
 
 - auf verschiedenen Instanzen trainieren und auf ungesehenen Instanzen (mit gleicher Requestgröße testen)
     --> Idee: vielleicht bringt hier die Monotonie einen Vorteil (robusteres / generalisiertes Modell)

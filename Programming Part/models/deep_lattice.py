@@ -1,3 +1,16 @@
+"""
+DeepLattice: zweistufiges monotones Lattice-Netzwerk für Q-Learning.
+
+Dieses Modul implementiert ein hierarchisches Lattice-Modell, das zuerst
+mehrere 3-Input-Lattices pro Ressource verarbeitet und deren Ausgaben
+über Zwischenkalibratoren in eine zweite Cross-Resource-Lattice-Schicht
+führt. Am Ende aggregiert ein nicht-negativer Linear-Layer die Features
+zu Q-Werten pro Aktion.
+
+Die Architektur nutzt domänenspezifische Monotonieannahmen für Zeit,
+Kapazität, Reward und Bedarf und sorgt so für ein strukturiertes,
+interpretierbares Modell mit monotonen Beziehungen.
+"""
 import torch
 import torch.nn as nn
 import numpy as np
@@ -6,7 +19,7 @@ from pytorch_lattice.layers import NumericalCalibrator, Lattice
 from pytorch_lattice.enums import Monotonicity, Interpolation
 
 
-class FullLatticeNetwork(nn.Module):
+class DeepLatticeNetwork(nn.Module):
     """
     Zweischichtiges Lattice-Netzwerk für Q(s,a).
 

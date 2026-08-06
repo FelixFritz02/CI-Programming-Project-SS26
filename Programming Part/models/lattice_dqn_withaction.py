@@ -1,3 +1,16 @@
+"""
+LatticeDQN mit aktionsabhängigem monotones Lattice.
+
+Dieses Modul definiert ein Netzwerk, das ein Standard-DQN mit einem
+aktionsabhängigen Lattice kombiniert. Der DQN-Pfad schätzt Q(s,a)
+für jeden Zustand und jede Aktion, während das Lattice einen zusätzlichen
+monotonen Bonus liefert, der von Kapazitätsfeatures C_1..C_K und der
+aktuellen Aktion abhängt.
+
+Das Lattice ist nur hinsichtlich der Kapazitäten monoton, nicht hinsichtlich
+der Aktion. Dadurch bleibt die Aktionsstruktur frei, während die Kapazitäts-
+Monotonie erhalten bleibt.
+"""
 import torch
 import torch.nn as nn
 import numpy as np

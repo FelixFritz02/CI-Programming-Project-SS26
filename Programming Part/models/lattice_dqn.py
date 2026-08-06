@@ -1,3 +1,13 @@
+"""
+LatticeDQN-Modell für kapazitätsmonotone Q-Wert-Schätzung.
+
+Dieses Modul definiert ein kombiniertes DQN/Lattice-Netzwerk, das
+aktionale Q-Werte aus einem Standard-DQN-Pfad berechnet und einen
+aktionsunabhängigen Kapazitätsbonus über ein monotonisches Lattice
+hinzufügt. Damit wird die Monotonie in den Kapazitätsfeatures C_1..C_K
+modelliert, während das DQN die aktionsspezifischen Entscheidungen
+lernt.
+"""
 import torch
 import torch.nn as nn
 import numpy as np
