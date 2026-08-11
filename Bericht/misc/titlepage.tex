@@ -1,0 +1,44 @@
+
+\newcommand{\maketitlepage}[7]{
+\begin{titlepage}
+
+\begin{center} % zentrieren
+
+  \begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.75\linewidth]{grafiken/rptu_logo}
+  \end{figure}
+  \textbf{\large Wirtschaftswissenschaften \\
+  \normalsize Fachgebiet Wirtschaftsinformatik \& Operations Research}\\
+  Prof. Dr. Oliver Wendt \\
+  \url{http://bisor.wiwi.uni-kl.de/}
+
+  \vfill
+
+  \begin{framed}
+    \begin{center}
+      \textbf{#1\\}
+      \bigskip
+      \textsc{{\Large #2}}
+    \end{center}
+  \end{framed}
+
+  \vfill
+
+  \begin{tabular*}{0.62\textwidth}{r@{\extracolsep{\fill}}l}
+   \\
+    Betreuer: \quad \qquad & Konstantin Kloster, M.\ Sc. \\
+    \\
+    Verfasser: \quad \qquad & \textbf{#3}\\
+    \quad \qquad & \textsc{#4@rhrk.uni-kl.de}\\
+    \quad \qquad &  Matrikel-\textnumero: #5\\
+    \quad \qquad & Studiengang: #6\\
+    \\
+    Eingereicht am: \quad \qquad & #7\\
+    \\
+  \end{tabular*}
+  \vfill
+\end{center}
+
+\end{titlepage}
+}
