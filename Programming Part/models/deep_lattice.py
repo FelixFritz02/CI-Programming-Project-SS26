@@ -14,7 +14,6 @@ interpretierbares Modell mit monotonen Beziehungen.
 import torch
 import torch.nn as nn
 import numpy as np
-from itertools import product
 from pytorch_lattice.layers import NumericalCalibrator, Lattice
 from pytorch_lattice.enums import Monotonicity, Interpolation
 
@@ -102,35 +101,41 @@ class DeepLatticeNetwork(nn.Module):
         mono_B = [Monotonicity.INCREASING, Monotonicity.DECREASING, Monotonicity.INCREASING]
         mono_C = [Monotonicity.DECREASING, Monotonicity.INCREASING, Monotonicity.DECREASING]
 
+        # Jede Ressource k bekommt EIN Lattice mit units=lattice_units statt
+        # lattice_units einzelnen Lattices mit units=1.
+        #
+        # "units" ist kein Modell-Unterschied, nur eine andere Berechnungsart:
+        # Ein Lattice mit units=U speichert an jeder der 8 Gitterecken einen
+        # Gewichtsvektor der Länge U statt eines einzelnen Gewichts (kernel-
+        # Form (8, U) statt (8, 1)) und ist damit intern äquivalent zu U
+        # unabhängigen Lattices mit derselben Gitter-Geometrie. Da alle U
+        # Ensemble-Member denselben Input bekommen, kann die Bibliothek die
+        # Interpolationsgewichte EINMAL berechnen und für alle U Gewichts-
+        # vektoren gleichzeitig verwenden (torch.sum(weights * kernel.t())),
+        # statt U-mal denselben Interpolationsschritt einzeln zu wiederholen
+        # und die U Einzel-Outputs danach mit cat() zusammenzufügen.
+        # Ergebnis ist numerisch identisch, aber ein Tensor-Op statt U
+        # Python-Aufrufe (siehe forward(): lat(inp.unsqueeze(1))).
         self.lattices_A = nn.ModuleList([
-            nn.ModuleList([
-                Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_A,
-                        interpolation=Interpolation.HYPERCUBE, units=1)
-                for _ in range(lattice_units)
-            ])
+            Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_A,
+                    interpolation=Interpolation.HYPERCUBE, units=lattice_units)
             for _ in range(K)
         ])
         self.lattices_B = nn.ModuleList([
-            nn.ModuleList([
-                Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_B,
-                        interpolation=Interpolation.HYPERCUBE, units=1)
-                for _ in range(lattice_units)
-            ])
+            Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_B,
+                    interpolation=Interpolation.HYPERCUBE, units=lattice_units)
             for _ in range(K)
         ])
         self.lattices_C = nn.ModuleList([
-            nn.ModuleList([
-                Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_C,
-                        interpolation=Interpolation.HYPERCUBE, units=1)
-                for _ in range(lattice_units)
-            ])
+            Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_C,
+                    interpolation=Interpolation.HYPERCUBE, units=lattice_units)
             for _ in range(K)
         ])
 
         # ------------------------------------------------------------------
         # 3. Zwischen-Calibratoren: ein eigener pro Lattice-Output aus Schicht 1
         #
-        # Schicht-1 produziert pro k: lattice_units Outputs für A, B, C
+        # Schicht-1 produziert pro k: lattice_units (U) Outputs für A, B, C
         # → 3 * K * lattice_units Calibratoren insgesamt
         # Alle INCREASING, da die Monotonie-Richtung bereits in Schicht 1 kodiert ist
         # ------------------------------------------------------------------
@@ -148,28 +153,30 @@ class DeepLatticeNetwork(nn.Module):
         # ------------------------------------------------------------------
         # 4. Schicht 2: Cross-resource Lattices
         #
-        # Jedes Lattice bekommt 3 Inputs aus verschiedenen (Gruppe, k)-Kombinationen.
-        # Wir erzeugen alle (Gruppe, k, unit)-Indizes und gruppieren sie in 3er-Tripel,
-        # die jeweils verschiedene Gruppen UND verschiedene k mischen.
+        # Jedes Lattice bekommt 3 Inputs: je einen Wert aus Gruppe A, B, C
+        # von jeweils möglichst unterschiedlichen Ressourcen k.
         #
         # Index-Schema für cal_between / Schicht-1-Outputs:
         #   out_A[k][u] → Index: 0*K*U + k*U + u
         #   out_B[k][u] → Index: 1*K*U + k*U + u
         #   out_C[k][u] → Index: 2*K*U + k*U + u
         #
-        # Cross-resource Tripel: (Gruppe_i != Gruppe_j != Gruppe_l) und (k_i != k_j wenn möglich)
-        # Bei K=1: nur verschiedene Gruppen möglich (k muss gleich sein)
+        # _build_cross_resource_triplets erzeugt genau K Tripel per
+        # rotierendem Offset (kA=i, kB=i+1, kC=i+2 mod K) statt aller K^3
+        # möglichen (kA,kB,kC)-Kombinationen — sonst würde Schicht 2 kubisch
+        # statt linear mit K wachsen (bei K=5 wären das 125 statt 5 Lattices).
+        # Bei K>=3 sind kA,kB,kC dadurch immer drei verschiedene Ressourcen,
+        # bei K<3 die maximal mögliche Anzahl. Die u-Indizes rotieren
+        # ebenfalls, damit nicht jedes Tripel denselben Ensemble-Member aus
+        # Schicht 1 sieht.
         # ------------------------------------------------------------------
         self.l2_triplets = self._build_cross_resource_triplets(K, lattice_units)
         n_l2_lattices = len(self.l2_triplets)
 
         mono_L2 = [Monotonicity.INCREASING] * 3  # Richtung steckt bereits in cal_between
         self.lattices_L2 = nn.ModuleList([
-            nn.ModuleList([
-                Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_L2,
-                        interpolation=Interpolation.HYPERCUBE, units=1)
-                for _ in range(lattice_units2)
-            ])
+            Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_L2,
+                    interpolation=Interpolation.HYPERCUBE, units=lattice_units2)
             for _ in range(n_l2_lattices)
         ])
 
@@ -192,8 +199,13 @@ class DeepLatticeNetwork(nn.Module):
 
         Jedes Tripel = (idx_A, idx_B, idx_C) mit:
           - idx_A aus Gruppe A, idx_B aus Gruppe B, idx_C aus Gruppe C
-          - k-Werte möglichst verschieden (cross-resource)
-          - u-Werte variieren um verschiedene Ensemble-Member zu mischen
+          - k-Werte möglichst verschieden (cross-resource): bei K>=3 immer 3
+            verschiedene Ressourcen, bei K<3 die maximal mögliche Anzahl
+          - u-Werte rotieren, um verschiedene Ensemble-Member zu mischen
+
+        Erzeugt genau K Tripel (rotierender Offset), nicht alle K^3
+        Kombinationen aus (k_A, k_B, k_C) — sonst wächst Schicht 2 kubisch
+        mit der Ressourcenzahl K statt linear.
 
         Index-Formel:
           Gruppe g ∈ {0,1,2}, Ressource k ∈ {0..K-1}, Unit u ∈ {0..U-1}
@@ -203,26 +215,121 @@ class DeepLatticeNetwork(nn.Module):
             return g * K * U + k * U + u
 
         triplets = []
-        # Für jede Kombination aus (k_A, k_B, k_C) mit möglichst verschiedenen k
-        # und rotierenden u-Werten
-        k_combos = list(product(range(K), repeat=3))
-        # Bevorzuge Combos wo alle k verschieden (cross-resource)
-        k_combos_cross = [c for c in k_combos if len(set(c)) == K] or k_combos
-
-        for u_offset, (kA, kB, kC) in enumerate(k_combos_cross):
-            uA = u_offset % U
-            uB = (u_offset + 1) % U
-            uC = (u_offset + 2) % U
-            triplet = (idx(0, kA, uA), idx(1, kB, uB), idx(2, kC, uC))
-            triplets.append(triplet)
+        for offset in range(K):
+            kA, kB, kC = offset % K, (offset + 1) % K, (offset + 2) % K
+            uA, uB, uC = offset % U, (offset + 1) % U, (offset + 2) % U
+            triplets.append((idx(0, kA, uA), idx(1, kB, uB), idx(2, kC, uC)))
 
         return triplets
 
     # ----------------------------------------------------------------------
 
+    @staticmethod
+    @torch.no_grad()
+    def _batched_apply_constraints(calibrators: nn.ModuleList) -> None:
+        """
+        Projiziert alle Calibratoren in `calibrators` in einem Batch-Op statt
+        N einzelnen apply_constraints()-Aufrufen mit je 8 Dykstra-Iterationen.
+
+        Setzt voraus, dass alle Calibratoren dieselbe output_min/output_max/
+        monotonicity/projection_iterations-Konfiguration teilen (hier immer
+        der Fall). Die Projektionsformeln aus NumericalCalibrator arbeiten
+        bereits elementweise/über dim=0, daher funktionieren sie unverändert
+        auf einem (n_keypoints, N)-Kernel statt (n_keypoints, 1) — es wird
+        nur die Iteration über die Calibratoren selbst eingespart.
+        """
+        ref = calibrators[0]
+        constrain_bounds = ref.output_min is not None or ref.output_max is not None
+        constrain_monotonicity = ref.monotonicity is not None
+        num_constraints = sum([constrain_bounds, constrain_monotonicity])
+        if num_constraints == 0:
+            return
+
+        kernel = torch.cat([cal.kernel.data for cal in calibrators], dim=1)  # (n_keypoints, N)
+        original_bias, original_heights = kernel[0:1], kernel[1:]
+
+        previous_bias_delta = {"BOUNDS": torch.zeros_like(original_bias)}
+        previous_heights_delta = {
+            "BOUNDS": torch.zeros_like(original_heights),
+            "MONOTONICITY": torch.zeros_like(original_heights),
+        }
+
+        def apply_bound_constraints(bias, heights):
+            previous_bias = bias - previous_bias_delta["BOUNDS"]
+            previous_heights = heights - previous_heights_delta["BOUNDS"]
+            if constrain_monotonicity:
+                bias, heights = ref._project_monotonic_bounds(previous_bias, previous_heights)
+            else:
+                bias, heights = ref._approximately_project_bounds_only(previous_bias, previous_heights)
+            previous_bias_delta["BOUNDS"] = bias - previous_bias
+            previous_heights_delta["BOUNDS"] = heights - previous_heights
+            return bias, heights
+
+        def apply_monotonicity_constraints(heights):
+            previous_heights = heights - previous_heights_delta["MONOTONICITY"]
+            heights = ref._project_monotonicity(previous_heights)
+            previous_heights_delta["MONOTONICITY"] = heights - previous_heights
+            return heights
+
+        def apply_dykstras_projection(bias, heights):
+            if constrain_bounds:
+                bias, heights = apply_bound_constraints(bias, heights)
+            if constrain_monotonicity:
+                heights = apply_monotonicity_constraints(heights)
+            return bias, heights
+
+        def finalize_constraints(bias, heights):
+            if constrain_monotonicity:
+                heights = ref._project_monotonicity(heights)
+            if constrain_bounds:
+                if constrain_monotonicity:
+                    bias, heights = ref._squeeze_by_scaling(bias, heights)
+                else:
+                    bias, heights = ref._approximately_project_bounds_only(bias, heights)
+            return bias, heights
+
+        projected_bias, projected_heights = apply_dykstras_projection(
+            original_bias, original_heights
+        )
+        if num_constraints > 1:
+            for _ in range(ref.projection_iterations - 1):
+                projected_bias, projected_heights = apply_dykstras_projection(
+                    projected_bias, projected_heights
+                )
+            projected_bias, projected_heights = finalize_constraints(
+                projected_bias, projected_heights
+            )
+
+        new_kernel = torch.cat((projected_bias, projected_heights), 0)  # (n_keypoints, N)
+        for i, cal in enumerate(calibrators):
+            cal.kernel.data = new_kernel[:, i:i+1].contiguous()
+
+    @staticmethod
+    def _batched_calibrate(x: torch.Tensor, calibrators: nn.ModuleList) -> torch.Tensor:
+        """
+        Kalibriert alle N Kanäle von x (B, N) in einem Batch-Op statt N
+        einzelnen NumericalCalibrator-Aufrufen.
+
+        Setzt voraus, dass alle Calibratoren in `calibrators` dieselben
+        (fixen) Keypoints benutzen — das ist hier immer der Fall, da jede
+        Gruppe (cal_c, cal_q, cal_between) mit identischer Konfiguration
+        erzeugt wird. Jeder Calibrator hat aber weiterhin sein eigenes
+        lernbares kernel und wird bei apply_constraints() individuell
+        projiziert.
+        """
+        ref = calibrators[0]
+        keypoints = ref._interpolation_keypoints  # (n_keypoints-1,)
+        lengths = ref._lengths                     # (n_keypoints-1,)
+        kernel = torch.cat([cal.kernel for cal in calibrators], dim=1)  # (n_keypoints, N)
+
+        weights = (x.double().unsqueeze(-1) - keypoints) / lengths  # (B, N, n_keypoints-1)
+        weights = weights.clamp(0.0, 1.0)
+        weights = torch.cat([torch.ones_like(weights[..., :1]), weights], dim=-1)  # (B, N, n_keypoints)
+
+        return torch.einsum("bnk,kn->bn", weights, kernel).float()
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         K = self.K
-        U = self.lattice_units
 
         # Features extrahieren
         t = x[:, 0:1]
@@ -233,19 +340,16 @@ class DeepLatticeNetwork(nn.Module):
         # Kalibrieren (Schicht 1 Input)
         t_cal = self.cal_t(t.double()).float()
         r_cal = self.cal_r(r.double()).float()
-        c_cal = torch.cat(
-            [cal(c[:, k:k+1].double()).float() for k, cal in enumerate(self.cal_c)],
-            dim=1,
-        )
-        q_cal = torch.cat(
-            [cal(q[:, k:k+1].double()).float() for k, cal in enumerate(self.cal_q)],
-            dim=1,
-        )
+        c_cal = self._batched_calibrate(c, self.cal_c)
+        q_cal = self._batched_calibrate(q, self.cal_q)
 
         # ------------------------------------------------------------------
         # Schicht 1: Lattice-Gruppen auswerten
+        # Jede Ressource k benutzt EIN Lattice mit units=lattice_units,
+        # das alle lattice_units Ensemble-Outputs in einem Aufruf liefert
+        # (die drei Inputs sind für alle Units identisch, daher genügt ein
+        # unsqueeze(1) statt eines echten repeats über die units-Dimension).
         # Reihenfolge der Outputs: alle A-Outputs (k=0..K-1), dann B, dann C
-        # Innerhalb jedes k: lattice_units viele Outputs
         # → Flat-Vektor der Länge 3*K*U für cal_between
         # ------------------------------------------------------------------
         out_A, out_B, out_C = [], [], []
@@ -253,14 +357,14 @@ class DeepLatticeNetwork(nn.Module):
             ck = c_cal[:, k:k+1]
             qk = q_cal[:, k:k+1]
 
-            inp_A = torch.cat([t_cal, r_cal, ck], dim=1).double()
-            inp_B = torch.cat([ck, qk, r_cal],    dim=1).double()
-            inp_C = torch.cat([t_cal, ck, qk],    dim=1).double()
+            inp_A = torch.cat([t_cal, r_cal, ck], dim=1).unsqueeze(1)
+            inp_B = torch.cat([ck, qk, r_cal],    dim=1).unsqueeze(1)
+            inp_C = torch.cat([t_cal, ck, qk],    dim=1).unsqueeze(1)
 
             # (B, lattice_units) pro Gruppe und k
-            out_A.append(torch.cat([lat(inp_A).float() for lat in self.lattices_A[k]], dim=1))
-            out_B.append(torch.cat([lat(inp_B).float() for lat in self.lattices_B[k]], dim=1))
-            out_C.append(torch.cat([lat(inp_C).float() for lat in self.lattices_C[k]], dim=1))
+            out_A.append(self.lattices_A[k](inp_A).float())
+            out_B.append(self.lattices_B[k](inp_B).float())
+            out_C.append(self.lattices_C[k](inp_C).float())
 
         # Flat-Vektor: (B, 3*K*U)
         # Reihenfolge: [A_k0_u0..u3, A_k1_u0..u3, B_k0..., C_k0...]
@@ -269,10 +373,7 @@ class DeepLatticeNetwork(nn.Module):
         # ------------------------------------------------------------------
         # Zwischen-Calibratoren: jeder Output bekommt seinen eigenen Calibrator
         # ------------------------------------------------------------------
-        l1_recal = torch.cat(
-            [cal(l1_flat[:, i:i+1].double()).float() for i, cal in enumerate(self.cal_between)],
-            dim=1,
-        )  # (B, 3*K*U)
+        l1_recal = self._batched_calibrate(l1_flat, self.cal_between)  # (B, 3*K*U)
 
         # ------------------------------------------------------------------
         # Schicht 2: Cross-resource Lattices
@@ -284,12 +385,10 @@ class DeepLatticeNetwork(nn.Module):
                 l1_recal[:, iA:iA+1],
                 l1_recal[:, iB:iB+1],
                 l1_recal[:, iC:iC+1],
-            ], dim=1).double()
+            ], dim=1).unsqueeze(1)
 
             # (B, lattice_units2)
-            l2_outputs.append(
-                torch.cat([lat(inp_L2).float() for lat in self.lattices_L2[trip_idx]], dim=1)
-            )
+            l2_outputs.append(self.lattices_L2[trip_idx](inp_L2).float())
 
         # Alles zusammenfügen → (B, n_triplets * lattice_units2)
         combined = torch.cat(l2_outputs, dim=1)
@@ -303,30 +402,23 @@ class DeepLatticeNetwork(nn.Module):
         # Input-Calibratoren
         self.cal_t.apply_constraints()
         self.cal_r.apply_constraints()
-        for cal in self.cal_c:
-            cal.apply_constraints()
-        for cal in self.cal_q:
-            cal.apply_constraints()
+        self._batched_apply_constraints(self.cal_c)
+        self._batched_apply_constraints(self.cal_q)
 
         # Schicht 1 Lattices
-        for group in self.lattices_A:
-            for lat in group:
-                lat.apply_constraints()
-        for group in self.lattices_B:
-            for lat in group:
-                lat.apply_constraints()
-        for group in self.lattices_C:
-            for lat in group:
-                lat.apply_constraints()
+        for lat in self.lattices_A:
+            lat.apply_constraints()
+        for lat in self.lattices_B:
+            lat.apply_constraints()
+        for lat in self.lattices_C:
+            lat.apply_constraints()
 
         # Zwischen-Calibratoren
-        for cal in self.cal_between:
-            cal.apply_constraints()
+        self._batched_apply_constraints(self.cal_between)
 
         # Schicht 2 Lattices
-        for group in self.lattices_L2:
-            for lat in group:
-                lat.apply_constraints()
+        for lat in self.lattices_L2:
+            lat.apply_constraints()
 
         # Nicht-negative Output-Gewichte
         with torch.no_grad():
@@ -416,8 +508,15 @@ class DeepLatticeNetwork(nn.Module):
 #
 #   Jedes Tripel hat die Form (A_kA_uA, B_kB_uB, C_kC_uC):
 #     — immer eine aus jeder Gruppe (A, B, C)
-#     — möglichst kA ≠ kB ≠ kC  (cross-resource)
+#     — kA, kB, kC bei K>=3 immer drei verschiedene Ressourcen
+#       (rotierender Offset i, i+1, i+2 mod K), bei K<3 die maximal
+#       mögliche Anzahl
 #     — rotierende Unit-Indizes (verschiedene Ensemble-Member)
+#
+#   _build_cross_resource_triplets erzeugt genau K Tripel (n_triplets = K),
+#   nicht alle K^3 möglichen (kA,kB,kC)-Kombinationen — sonst würde Schicht 2
+#   kubisch statt linear mit der Ressourcenzahl K wachsen (bei K=5 z.B. 125
+#   statt 5 Lattices).
 #
 #   Dadurch kann Schicht 2 lernen, wie z.B. die Kapazitätssituation
 #   von Ressource 1 mit dem Zeitdruck-Reward-Profil von Ressource 2
@@ -427,8 +526,8 @@ class DeepLatticeNetwork(nn.Module):
 #   Input-Calibratoren und wird durch INCREASING Zwischen-Calibratoren
 #   durchgereicht).
 #
-#   Ausgabe: n_triplets * lattice_units2 Skalare
-#   Parameter: n_triplets * lattice_units2 * 8
+#   Ausgabe: K * lattice_units2 Skalare
+#   Parameter: K * lattice_units2 * 8
 #
 # -----------------------------------------------------------------------------
 # SCHICHT 3 — Output-Layer  Linear(≥0) → Q(s,a)
@@ -440,7 +539,7 @@ class DeepLatticeNetwork(nn.Module):
 #   ein positiver Einfluss in Schicht 1 kann durch den Output-Layer nicht
 #   umgekehrt werden.
 #
-#   Parameter: (n_triplets * lattice_units2 + 1) * output_dim
+#   Parameter: (K * lattice_units2 + 1) * output_dim
 #
 # -----------------------------------------------------------------------------
 # PARAMETERÜBERSICHT (Beispiel K=2, P=8, U=4, U2=2, D_out=2)
@@ -449,8 +548,8 @@ class DeepLatticeNetwork(nn.Module):
 #   Input-Calibratoren  (2+2*2)*8         =  48
 #   Lattice Schicht 1   3*2*4*8           = 192
 #   Zwischen-Calibrat.  3*2*4*8           = 192
-#   Lattice Schicht 2   8 Triplets*2*8    = 128
-#   Output-Layer        (16+1)*2          =  34
-#                                    Σ  = 594
+#   Lattice Schicht 2   K=2 Triplets*2*8  =  32
+#   Output-Layer        (4+1)*2           =  10
+#                                    Σ  = 474
 #
 # =============================================================================
