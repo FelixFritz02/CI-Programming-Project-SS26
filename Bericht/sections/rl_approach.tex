@@ -201,7 +201,9 @@ monotone Kombinationen dieser Größen lernen kann.
 kalibrierten Output aus Gruppe $A$, $B$ und $C$ unterschiedlicher Ressourcen $k$ zu neuen
 3-Input-Lattices. So kann das Netz z.\,B.\ lernen, wie die Kapazitätssituation von Ressource~1 mit
 dem Zeitdruck-Belohnungs-Profil von Ressource~2 zusammenwirkt -- eine Interaktion, die Schicht~1
-strukturell nicht abbilden kann.
+strukturell nicht abbilden kann. Ein rotierender Ressourcen-Offset erzeugt dabei genau $K$ solcher
+Tripel (statt aller $K^3$ möglichen Kombinationen), sodass Schicht~2 linear und nicht kubisch mit
+der Ressourcenzahl $K$ wächst.
 
 \textbf{Output-Layer.} Ein \texttt{Linear}-Layer aggregiert alle Schicht-2-Outputs zu einem
 $Q$-Wert pro Aktion. Seine Gewichte werden nach jedem Optimierungsschritt auf $\geq 0$ geklemmt
@@ -400,4 +402,4 @@ Eckgewichts-Vektor (\texttt{pytorch\_lattice/layers/lattice.py},
 Als Beispielrechnung (siehe \texttt{models/MODEL\_ARCHITECTURES.md}) ergibt sich für $K=2$
 Ressourcen, $8$~Kalibrator-Stützpunkte, $U=4$ Ensemble-Einheiten in Schicht~1 und $U_2=2$ in
 Schicht~2 folgende Parameteraufteilung: Input-Kalibratoren $48$, Schicht~1 $192$,
-Zwischenkalibratoren $192$, Schicht~2 $128$ und Output-Layer $34$ Parameter, insgesamt $594$.
+Zwischenkalibratoren $192$, Schicht~2 $32$ und Output-Layer $10$ Parameter, insgesamt $474$.
