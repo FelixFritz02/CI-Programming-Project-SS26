@@ -66,6 +66,112 @@ def plot_depth_epsilon(depth_history, title="Episodentiefe und Epsilon über das
     plt.show()
 
 
+def plot_eval_rewards(eval_rewards, window=50, title="Eval-Reward-History", verbose=True):
+    """
+    Plottet den Reward-Verlauf einer Evaluationsphase (z.B. DQNAgent.evaluate())
+    zusammen mit gleitendem Mittelwert und Gesamt-Mittelwert, und gibt
+    Kennzahlen (Mean/Std/Median/Max/Min) aus.
+
+    Einheitliche Eval-Darstellung, damit standard_dqn, deep_lattice etc. direkt
+    vergleichbar sind (gleiche Kennzahlen, gleiches Plot-Layout).
+
+    Parameter
+    ----------
+    eval_rewards : Liste/Array kumulierter Rewards je Eval-Episode
+    window        : Fenstergröße für gleitenden Mittelwert
+    title         : Plot-Titel
+    verbose       : Kennzahlen ausgeben
+
+    Rückgabe
+    --------
+    stats: dict mit n, mean, std, median, max, min
+    """
+    r = np.array(eval_rewards)
+    n = len(r)
+
+    stats = {
+        "n": n,
+        "mean": r.mean(),
+        "std": r.std(ddof=1) if n > 1 else 0.0,
+        "median": np.median(r),
+        "max": r.max(),
+        "min": r.min(),
+    }
+
+    if verbose:
+        print(f"Eval-Episoden: {stats['n']}")
+        print(f"Mean: {stats['mean']:.4f}, Std: {stats['std']:.4f}, Median: {stats['median']:.4f}")
+        print(f"Max: {stats['max']:.4f}, Min: {stats['min']:.4f}")
+
+    plt.figure(figsize=(9, 4))
+    plt.plot(r, alpha=0.4, label="Cumulated Reward pro Eval-Episode")
+    if n >= window:
+        mov = np.convolve(r, np.ones(window) / window, mode="valid")
+        plt.plot(np.arange(window - 1, n), mov, color="orange", label=f"{window}-Episode moving average")
+    plt.axhline(stats["mean"], color="red", linestyle="--", label=f"Mean = {stats['mean']:.2f}")
+    plt.xlabel("Eval-Episode")
+    plt.ylabel("Cumulated Reward")
+    plt.title(title)
+    plt.legend(fontsize="small")
+    plt.grid(True)
+    plt.show()
+
+    return stats
+
+
+def plot_reward_moving_average(reward_history, window=50, title="Reward History", figsize=(9,4), verbose=True):
+    """Plot kumulierter Reward pro Episode mit gleitendem Mittelwert.
+
+    Parameters
+    ----------
+    reward_history : list/array
+        Kumulierte Rewards pro Trainings-Episode
+    window : int
+        Fenstergröße für gleitenden Mittelwert
+    title : str
+        Plot-Titel
+    figsize : tuple
+        Figurgröße
+    verbose : bool
+        Kennzahlen (mean/std/median/max/min) ausgeben
+
+    Returns
+    -------
+    dict
+        Statistische Kennzahlen
+    """
+    r = np.array(reward_history)
+    n = len(r)
+
+    stats = {
+        "n": n,
+        "mean": r.mean() if n>0 else float('nan'),
+        "std": r.std(ddof=1) if n > 1 else 0.0,
+        "median": np.median(r) if n>0 else float('nan'),
+        "max": r.max() if n>0 else float('nan'),
+        "min": r.min() if n>0 else float('nan'),
+    }
+
+    if verbose:
+        print(f"Episoden: {stats['n']}")
+        print(f"Mean: {stats['mean']:.4f}, Std: {stats['std']:.4f}, Median: {stats['median']:.4f}")
+        print(f"Max: {stats['max']:.4f}, Min: {stats['min']:.4f}")
+
+    plt.figure(figsize=figsize)
+    plt.plot(r, label='Cumulated Reward per Episode', alpha=0.6)
+    if n >= window and window > 0:
+        mov = np.convolve(r, np.ones(window) / window, mode='valid')
+        plt.plot(np.arange(window - 1, n), mov, color='red', label=f'{window}-Episode moving average')
+    plt.xlabel('Episode')
+    plt.ylabel('Cumulated Reward')
+    plt.title(title)
+    plt.legend(fontsize='small')
+    plt.grid(True)
+    plt.show()
+
+    return stats
+
+
 def plot_training_diagnostics(reward_history, depth_history=None, monotonicity_history=None, window=50, title="Training Diagnostics"):
     """
     Erweiterte Diagnose-Plots:

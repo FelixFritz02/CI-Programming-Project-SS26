@@ -418,6 +418,72 @@ class DQNAgent:
 
         return reward_history, monotonicity_history, depth_history
 
+    # ------------------------------------------------------------------
+    # Evaluationsschleife (rein exploitativ, ohne Training)
+    # ------------------------------------------------------------------
+
+    def evaluate(self, num_episodes: int = 10_000, verbose: bool = True) -> tuple:
+        """
+        Evaluiert den (fertig trainierten) Agenten rein exploitativ.
+
+        Epsilon wird auf 0 gesetzt (keine Exploration), das Netz läuft im
+        Eval-Modus unter torch.no_grad(), und es finden keine Trainingsschritte,
+        Buffer-Updates, Epsilon-Decays oder Soft-Updates statt. Die Gewichte
+        von policy_net/target_net bleiben also unverändert (eingefroren).
+
+        Der ursprüngliche epsilon-Wert wird am Ende wiederhergestellt, damit
+        der Agent danach bei Bedarf weiterverwendet werden kann.
+
+        Parameter
+        ----------
+        num_episodes : Anzahl Evaluierungsepisoden
+        verbose       : Ausgabe nach je 500 Episoden
+
+        Rückgabe
+        --------
+        reward_history: kumulierter Reward je Episode
+        depth_history  : Liste von (episode, erreichte_tiefe)-Tupeln
+        """
+        original_epsilon = self.epsilon
+        self.epsilon = 0.0
+        self.policy_net.eval()
+
+        reward_history: list = []
+        depth_history: list = []
+
+        try:
+            with torch.no_grad():
+                for episode in range(num_episodes):
+                    obs, _ = self.env.reset()
+                    done = False
+                    cumulated_reward = 0.0
+                    episode_depth = 0
+
+                    while not done:
+                        action = self.select_action(obs)
+                        obs, reward, terminated, truncated, _ = self.env.step(action)
+                        done = terminated or truncated
+
+                        cumulated_reward += reward
+                        episode_depth += 1
+
+                    reward_history.append(cumulated_reward)
+                    depth_history.append((episode + 1, episode_depth))
+
+                    if verbose and (episode + 1) % 500 == 0:
+                        avg = np.mean(reward_history[-500:])
+                        avg_depth = np.mean([d for _, d in depth_history[-500:]])
+                        print(f"[Eval] Episode {episode + 1:>5}/{num_episodes}  "
+                              f"Reward: {cumulated_reward:>8.2f}  "
+                              f"Avg(500): {avg:>8.2f}  "
+                              f"Avg-Tiefe(500): {avg_depth:>6.1f}")
+        finally:
+            # Agent-Zustand wiederherstellen, unabhängig davon ob die Schleife
+            # regulär durchlief oder z.B. per KeyboardInterrupt abgebrochen wurde.
+            self.epsilon = original_epsilon
+            self.policy_net.train()
+
+        return reward_history, depth_history
 
     def save(self, path: str):
         """Speichert die Gewichte des Policy-Netzes."""
