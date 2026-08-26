@@ -2,3 +2,48 @@
 \label{sec:introduction}
 
 TODO: Motivation, Problemstellung und Aufbau des Berichts.
+
+\subsection{Related Work}
+\label{subsec:related-work}
+
+This report builds mainly on two lines of work. The first is formulating the \acs{drausp} as an
+\acs{mdp} and solving it with reinforcement learning, specifically Q-learning. The second is
+incorporating monotonicity constraints into the Q-learning model, so that structural knowledge
+about the problem can be exploited to improve the learning process.
+
+\textbf{Formulating DRAUSP as an MDP.} The \acs{drausp} was first introduced by
+\textcite{drausp_lion18}, who already formulate it as a finite-horizon \acs{mdp} and solve it via
+exact stochastic dynamic programming, complemented by a dimension compression algorithm that
+yields upper and lower bounds when the state space becomes too large to enumerate exactly. Their
+results also show that simple heuristics (e.g., first-come-first-served) are insufficient once
+the trade-off between immediate and future revenue becomes non-trivial, motivating more
+sophisticated, learning-based acceptance and scheduling policies. The authors set up instances for
+numerical experiments with up to $K=10$ capacity slots. We will use the same numerical instances
+to evaluate the performance of the monotonicity-constrained \acs{rl} models introduced in this report, later on.
+
+\textbf{Value-based deep reinforcement learning.} Exact dynamic programming, as used by
+\textcite{drausp_lion18}, suffers from growing instances and becomes computationally intractable for 
+larger instances. \Acs{rl} addresses this by learning an action-value
+function $Q(s,a)$ from sampled experience instead of solving the stochastic dynamic programming problem
+exactly. \textcite{watkins1992} introduce Q-learning, the algorithm underlying all value-based
+\acs{rl} methods used in this report, and \textcite{suttonbarto2018} provide the standard reference
+for the underlying \acs{mdp} formalism and solution methods. \textcite{mnih2015} extend Q-learning
+with a deep neural network as function approximator (\acs{dqn}), together with experience replay
+and a target network to stabilize training. This is exactly the architecture that forms the baseline 
+for our models later on.
+
+\textbf{Monotonicity constraints in learned models.} A plain \acs{dqn} has no built-in guarantee
+that $Q(s,a)$ respects domain knowledge such as ``more capacity is never worse'' -- such
+relationships can, at best, be encouraged through additional loss terms, without any guarantee
+that they hold at inference time. \textcite{you2017} instead propose enforcing monotonicity
+\emph{structurally}, in the architecture itself: \emph{Deep Lattice Networks} alternate layers of
+monotonic calibrators and ensembles of interpolated look-up tables (lattices), each of which is
+constrained during training so that the composed, end-to-end function is provably monotonic in a
+user-specified subset of its inputs. This report adopts that architecture for the \acs{drausp} $Q$-function,
+using it to enforce the monotonicity relations postulated in
+Section~\ref{subsec:monotonicity} by construction rather than by regularization.
+
+In summary, this report combines the \acs{mdp} formulation of the \acs{drausp} introduced by
+\textcite{drausp_lion18} with value-based deep \acs{rl} \parencite{watkins1992,mnih2015} to scale
+beyond exact dynamic programming, and further constrains the learned $Q$-function to be
+structurally monotonic using the Deep Lattice Network architecture of \textcite{you2017}.
