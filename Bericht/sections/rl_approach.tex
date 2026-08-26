@@ -3,6 +3,117 @@
 
 TODO: Belohnungsfunktion, DQN-Agent (Trainingsschleife, Replay-Buffer, Zielnetzwerk, $\epsilon$-greedy).
 
+To use reinforcement learning techniques for modeling the \ac{drausp}, first of all we need to define
+a \ac{mdp} that represents the problem. We define a state space,an action space and a transition function: 
+
+\textbf{State space.} A state
+\[
+  s = (t, \hat C_1, \dots, \hat C_K, r, q_1, \dots, q_K) \in \mathcal{S} \subseteq \mathbb{R}^{2K+2}
+\]
+consists of the current decision epoch $t \in \{1,\dots,T_d\}$, the remaining capacities
+$\hat C_k \in \{0,\dots,C_k^{(0)}\}$ of each resource $k=1,\dots,K$, and the request $[r,q]$
+currently up for decision, with reward $r \in \mathbb{R}_{\ge 0}$ and (zero-padded) demand vector
+$q \in \mathbb{N}_0^K$. The initial state is $s_1 = (1, C_1^{(0)}, \dots, C_K^{(0)}, r_1, q_1)$.
+
+\textbf{Action space.} $\mathcal{A} = \{0,1,\dots,K\}$: action $a=0$ rejects the current request; action $a \in \{1,\dots,K\}$ accepts it and schedules it starting at slot $a$.
+Assume that the current request has length $\ell \in \{1,\dots,K\}$ and demand vector $q = (q_1,\dots,q_\ell,0,\dots,0)$ (zero-padded to length $K$). Then the action $a$ is feasible if and only if 
+\begin{itemize}
+ \item $a+\ell-1 \le K$, we do not exceed the maximum length of resources
+ \item $\hat C_{a+i-1} \ge q_i$ for all $i=1,\dots,\ell$, the capacity of all affected slots is sufficient to accept the request
+\end{itemize} 
+Note that for a given state not all actions are feasible: We define the feasible action set $\mathcal{A}_s^{\text{valid}} \subseteq \mathcal{A}$ as the set of actions that do not exceed the remaining capacity of any affected slot and do not exceed the horizon $K$.
+Nevertheless the set of valid actions $\mathcal{A}_s^{\text{valid}}$ is never empty, since $0 \in \mathcal{A}_s^{\text{valid}}$ for all states $s$.
+We will use the set of valid actions later on.
+
+\textbf{Transition function.} $\mathcal{T}: \mathcal{S} \times \mathcal{A} \to \mathcal{S}$
+deterministically updates the remaining capacities according to the chosen action, appends the next request
+$[r_{t+1}, q_{t+1}]$ drawn from the instance's request sequence, and advances time, $t \mapsto t+1$. 
+The new capacities are given by the following equation:
+\[
+  \hat C_{a+i-1} \;\leftarrow\; \hat C_{a+i-1} - q_i, \qquad i = 1,\dots,\ell.
+\]
+Note that $\hat{C_k} \geq 0$ for all valid actions $a \in \mathcal{A}_x^{\text{valid}}$ and all $k=1,\dots,K$.
+
+Figure~\ref{fig:state-transition} illustrates the effect of the transition function $\mathcal{T}$ on a concrete example with
+$K=5$, request length $\ell=3$, action $a=2$ and applies the update rule.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[font=\small,
+      slot/.style={draw, minimum width=11mm, minimum height=11mm},
+      occ/.style ={draw, fill=orange!25, minimum width=11mm, minimum height=11mm},
+      >={Latex[length=2mm]}
+    ]
+    % Before-row: state s at epoch t
+    \node[anchor=east] at (-0.5,0)  {before, $s_t$:};
+    \node[slot] (b1) at (0,0)   {$\hat C_1$};
+    \node[occ]  (b2) at (1.3,0) {$\hat C_2$};
+    \node[occ]  (b3) at (2.6,0) {$\hat C_3$};
+    \node[occ]  (b4) at (3.9,0) {$\hat C_4$};
+    \node[slot] (b5) at (5.2,0) {$\hat C_5$};
+
+    \node[below=1pt, gray] at (b1.south) {\scriptsize $k=1$};
+    \node[below=1pt, gray] at (b2.south) {\scriptsize $k=2$};
+    \node[below=1pt, gray] at (b3.south) {\scriptsize $k=3$};
+    \node[below=1pt, gray] at (b4.south) {\scriptsize $k=4$};
+    \node[below=1pt, gray] at (b5.south) {\scriptsize $k=5$};
+
+    \draw[decorate, decoration={brace, amplitude=5pt}] (1.85+0.05,0.65) -- (3.55-0.05,0.65)
+      node[midway, above=5pt] {action $a=2$, request length $\ell=3$};
+
+    % After-row: state s_{t+1} after applying T
+    \node[anchor=east] at (-0.5,-3) {after, $s_{t+1}$:};
+    \node[slot] (a1) at (0,-3)   {$\hat C_1$};
+    \node[occ]  (a2) at (1.3,-3) {$\hat C_2{-}q_1$};
+    \node[occ]  (a3) at (2.6,-3) {$\hat C_3{-}q_2$};
+    \node[occ]  (a4) at (3.9,-3) {$\hat C_4{-}q_3$};
+    \node[slot] (a5) at (5.2,-3) {$\hat C_5$};
+
+    \draw[->, dashed, gray] (b1) -- (a1);
+    \draw[->] (b2) -- node[right, xshift=1pt] {$-q_1$} (a2);
+    \draw[->] (b3) -- node[right, xshift=1pt] {$-q_2$} (a3);
+    \draw[->] (b4) -- node[right, xshift=1pt] {$-q_3$} (a4);
+    \draw[->, dashed, gray] (b5) -- (a5);
+  \end{tikzpicture}
+  \caption{Effect of the transition function $\mathcal{T}$ ($K=5$ slots, request length $\ell=3$, action $a=2$): the
+    remaining capacities of the three occupied slots each decrease by the corresponding entry of
+    the demand vector $q$, while the capacities of slots outside the accepted block ($k=1,5$)
+    are unaffected.}
+  \label{fig:state-transition}
+\end{figure}
+
+\textbf{Reward.} The reward function $\mathcal{R}: \mathcal{S} \times \mathcal{A} \to \mathbb{R}$ is defined as follows:
+\[
+  \mathcal{R}(s,a) =
+  \begin{cases}
+    r, & \text{if } a \in \mathcal{A}_s^{\text{valid}} \setminus \{0\} \\
+    0, & \text{if } a = 0 \\
+    -100, & \text{if } a \notin \mathcal{A}_s^{\text{valid}}
+  \end{cases}
+\]
+Selecting an infeasible action, terminates the episode and yields a large negative reward of $-100$ to discourage the agent from taking invalid actions.
+
+\textbf{Objective.} What we actually want to learn is the optimal action-value function
+$Q^*(s,a)$: given a state $s$ and an action $a$, it returns the maximum expected cumulative
+reward obtainable from now, time step $t$, until the end of the horizon $T_d$, if $a$ is taken in $s$ and the
+optimal policy is followed afterwards,
+\[
+  Q^*(s,a) = \max_\pi \; \mathbb{E}\Big[\, \sum_{t'=t}^{T_d} \gamma^{t'-t} \cdot \mathcal{R}(s_{t'}, a_{t'}) \;\Big|\; s_t = s,\, a_t = a \,\Big].
+\]
+Note that this is not a greedy problem: accepting a request now reduces the remaining capacities $\hat C$
+and can make more valuable future requests infeasible, so $Q^*$ has to trade off the immediate
+reward $r$ against the option value of keeping capacity free. Once $Q^*$ is known (or
+approximated by a trained network), the optimal policy follows directly by acting greedily with
+respect to it:
+\[
+  \pi^*(s) = \arg\max_{a \in \mathcal{A}_s} Q^*(s,a).
+\]
+
+Note that the defined \ac{mdp} differs slightly from the one given by Caspar et al. \textcite{drausp_lion18}
+The requests are modeled in the state space, while in the original paper they are modeled in the action space by
+---- hier nochmal nachschauen we das vom Kloster gemacht wurde und vergleichen -------
+
+
 \subsection{Zustands- und Aktionsraum}
 \label{subsec:state-action}
 
@@ -12,7 +123,7 @@ Planungshorizont von $T_d$ Entscheidungsepochen \emph{nie} wieder aufgefüllt we
 zu Beginn von Epoche $t$ lässt sich als
 \begin{equation}
   \label{eq:state}
-  x = \big[\, t,\; \hat C_1, \dots, \hat C_K,\; r,\; q_1, \dots, q_K \,\big] \in \mathbb{R}^{2K+2}
+  s = \big[\, t,\; \hat C_1, \dots, \hat C_K,\; r,\; q_1, \dots, q_K \,\big] \in \mathbb{R}^{2K+2}
 \end{equation}
 darstellen, wobei $t$ die verstrichene Zeit, $\hat C_k$ die verbleibende Restkapazität von Slot
 $k$, $r$ die Belohnung der in Epoche $t$ eintreffenden Anfrage und $q_k$ deren Bedarfsvektor
@@ -104,7 +215,7 @@ rückwärtslaufender Stufenindex ihrer Rekursion. Insbesondere ist die aktuelle 
 \emph{nicht} im Zustand enthalten -- sie bestimmt stattdessen direkt die Aktionsmenge $A_s$: Eine
 Aktion $a=[a_r,a_q]$ enthält bereits den auf eine konkrete Startposition verschobenen, gepaddeten
 Bedarfsvektor als vollen $K$-dimensionalen Vektor, und der Übergang $s_{t-1} = cap - a_q$ ist
-deterministisch. Unser Zustand $x$ (Gleichung~\eqref{eq:state}) enthält $r$ und $q$ dagegen
+deterministisch. Unser Zustand $s$ (Gleichung~\eqref{eq:state}) enthält $r$ und $q$ dagegen
 explizit, während unsere Aktion auf den schlanken Startslot $a \in \{0,\dots,K\}$ reduziert ist.
 Tabelle~\ref{tab:mdp-comparison} fasst diese strukturelle Gegenüberstellung zusammen; \emph{wie}
 die beiden Formulierungen anschließend gelöst werden (exakte dynamische Programmierung vs.\
@@ -117,7 +228,7 @@ Funktionsapproximation per DQN), wird gesondert im Abschnitt zum DQN-Agenten beh
      & \textbf{Paper} & \textbf{Unser Ansatz} \\
     \midrule
     Zustand  & $s_t = (\hat C_1,\dots,\hat C_K)$, $t$ separater Stufenindex
-             & $x = [t,\hat C_1,\dots,\hat C_K,r,q_1,\dots,q_K]$ \\
+             & $s = [t,\hat C_1,\dots,\hat C_K,r,q_1,\dots,q_K]$ \\
     Anfrage  & steckt in der Aktionsmenge $A_s$
              & steckt explizit im Zustand \\
     Aktion   & $a=[a_r,a_q]$: voller, request-abhängiger $K$-Vektor pro Startposition
@@ -140,7 +251,7 @@ Dafür muss der Zustand die Anfrage enthalten, damit der Agent die Belohnung und
 \subsection{Monotonicity in the Q-Function}
 \label{subsec:monotonicity}
 
-Für den in Gleichung~\eqref{eq:state} eingeführten Zustand $x$ lassen sich plausible
+Für den in Gleichung~\eqref{eq:state} eingeführten Zustand $s$ lassen sich plausible
 monotone Beziehungen zwischen einzelnen Zustandsgrößen und dem optimalen $Q$-Wert postulieren:
 
 \begin{itemize}
