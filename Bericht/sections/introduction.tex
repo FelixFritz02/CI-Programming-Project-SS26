@@ -2,6 +2,39 @@
 \label{sec:introduction}
 
 TODO: Motivation, Problemstellung und Aufbau des Berichts.
+\subsection{Motivation and Problem Statement}
+\label{subsec:motivation}
+
+Many real-world planning problems require an \textit{online} decision maker to accept or reject incoming requests in real time, without knowledge of which requests will arrive in the future. Decision makers are faced with the trade-off: accepting a low-value request now may consume capacity that a more valuable
+request would have needed later, while rejecting too eagerly leaves capacity unused. Classical
+revenue management addresses this trade-off for single, homogeneous resources, but many practical
+settings additionally require a request to be placed as a single, contiguous, unsplittable block
+across \emph{several} resources with different capacities at once, which substantially complicates the
+decision problem.
+
+The problem of interest in this paper is the \emph{Dynamic Request Acceptance and Unsplittable Scheduling
+Problem} (\acs{drausp}), where the task is to decide whether to accept or reject incoming requests with specific resource requirements and revenue and how to schedule them across multiple resources in order to  maximize the cumulated reard. The main difficulty in this problem is that it requires making irrevocable decisions, before knowing which requests will arrive in the future. 
+In an upfront decision horizon there arrive $T_d \in \mathcal{N}_{>0}$ many requests succesively. Each request $r_t$ is characterized by a tuple $(r,q)$, where $r$ is the immediate positive reward offered for accepting the request and $q = (q_1, q_2, \ldots, q_{len(q)})$ represents the resource requirements. 
+
+The decision maker has to schedule the accepted requests as one block directly after acceptance onto the $K \in \mathcal{N}_{>0}$ many resources with different capacities $c_k \in \mathcal{N}_{>0}$ for $k = 1, \ldots, K$. 
+
+Each request must be scheduled in a contiguous block of slots across the available resources without exceeding the capacity $C_k$ of any resource $k$. Once a request is accepted and scheduled, it occupies those slots for the remainder of the horizon and cannot be split, relocated, or revoked. 
+Depending on the available capacity and the resource requirements of the request, the decision maker has to decide first whether to accept or reject the request and second, if accepted, how to schedule it across the available resources. In the scheduling of a request of length $len(q)$, the decision maker has to choose a starting position $s \in \{1, \ldots, K - len(q) + 1\}$.
+The objective is to choose an acceptance-and-scheduling policy to maximize the total revenue over the decision horizon.
+
+
+\acs{drausp} is difficult precisely because it is sequential and combinatorial at the same time:
+the number of feasible placements for a request grows with the number of resources $K$, and the
+value of accepting a request today can only be judged against the (unknown) value of the requests
+still to come. \textcite{drausp_lion18} show that exact stochastic dynamic programming solves
+\acs{drausp} optimally, but that this approach becomes computationally intractable as the state
+space grows with $K$ and the horizon -- motivating the reinforcement-learning-based, function-
+approximation approach pursued in this report. In addition, the problem exhibits domain structure
+that a generic learned model does not respect automatically -- e.g., more remaining capacity should
+never make a state look worse.
+In this paper we exploit whether make usage of meaningful structure explicitly by enforcing a model to incorporate this structure rather than hoping a model learns it, improves the reliability sample results of the learned policy.
+
+
 
 \subsection{Related Work}
 \label{subsec:related-work}
