@@ -11,9 +11,14 @@ a \ac{mdp} that represents the problem. We define a state space,an action space 
   s = (t, \hat C_1, \dots, \hat C_K, r, q_1, \dots, q_K) \in \mathcal{S} \subseteq \mathbb{R}^{2K+2}
 \]
 consists of the current decision epoch $t \in \{1,\dots,T_d\}$, the remaining capacities
-$\hat C_k \in \{0,\dots,C_k^{(0)}\}$ of each resource $k=1,\dots,K$, and the request $[r,q]$
+$\hat C_k \in \{0,\dots,C_k^{(0)}\}$ of each resource $k=1,\dots,K$, and the $t$-th request $[r,q]$
 currently up for decision, with reward $r \in \mathbb{R}_{\ge 0}$ and (zero-padded) demand vector
-$q \in \mathbb{N}_0^K$. The initial state is $s_1 = (1, C_1^{(0)}, \dots, C_K^{(0)}, r_1, q_1)$.
+$q \in \mathbb{N}_0^K$:
+\begin{equation}
+  \label{eq:padding}
+  q = (\underbrace{q_1, \dots, q_\ell}_{\text{demanded capacities}},\; \underbrace{0, \dots, 0}_{K-\ell \text{ padding}}\,).
+\end{equation}
+The initial state is $s_1 = (1, C_1^{(0)}, \dots, C_K^{(0)}, r_1, q_1)$.
 
 \textbf{Action space.} $\mathcal{A} = \{0,1,\dots,K\}$: action $a=0$ rejects the current request; action $a \in \{1,\dots,K\}$ accepts it and schedules it starting at slot $a$.
 Assume that the current request has length $\ell \in \{1,\dots,K\}$ and demand vector $q = (q_1,\dots,q_\ell,0,\dots,0)$ (zero-padded to length $K$). Then the action $a$ is feasible if and only if 
@@ -93,25 +98,70 @@ $K=5$, request length $\ell=3$, action $a=2$ and applies the update rule.
 \]
 Selecting an infeasible action, terminates the episode and yields a large negative reward of $-100$ to discourage the agent from taking invalid actions.
 
-\textbf{Objective.} What we actually want to learn is the optimal action-value function
-$Q^*(s,a)$: given a state $s$ and an action $a$, it returns the maximum expected cumulative
-reward obtainable from now, time step $t$, until the end of the horizon $T_d$, if $a$ is taken in $s$ and the
-optimal policy is followed afterwards,
+\textbf{Objective.} 
+Given a MDP the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes the expected cumulative reward over the decision horizon. In our case, the objective is to maximize the total revenue over the decision horizon by learning an acceptance-and-scheduling policy that maps states to actions.
+\begin{equation*}
+      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{\infty}\gamma^{t} r_t\Bigg]
+  \end{equation*}
+Solving this optimization directly is a hard task because we have to find the optimal policy $\pi^*$ over the whole state space and the policy $\pi$ is itself part of the expectation. Instead, we will use Q-learning to learn the optimal action-value function $Q^*(s,a)$, which allows us to derive the optimal policy $\pi^*$ by acting greedily with respect to it.
+
+\textbf{(Deep) Q-Learning.} 
+In Q-learning, we learn the optimal action-value function
 \[
   Q^*(s,a) = \max_\pi \; \mathbb{E}\Big[\, \sum_{t'=t}^{T_d} \gamma^{t'-t} \cdot \mathcal{R}(s_{t'}, a_{t'}) \;\Big|\; s_t = s,\, a_t = a \,\Big].
 \]
-Note that this is not a greedy problem: accepting a request now reduces the remaining capacities $\hat C$
-and can make more valuable future requests infeasible, so $Q^*$ has to trade off the immediate
-reward $r$ against the option value of keeping capacity free. Once $Q^*$ is known (or
+Once $Q^*$ is known (or
 approximated by a trained network), the optimal policy follows directly by acting greedily with
 respect to it:
 \[
-  \pi^*(s) = \arg\max_{a \in \mathcal{A}_s} Q^*(s,a).
+  \pi^*(s) = \arg\max_{a \in \mathcal{A}} Q^*(s,a).
 \]
+Remark that Q-Learning suffers from the curse of dimensionality, since the state space grows exponentially with the number of resources $K$ and the number of requests $T_d$. Therefore, we will use a Deep Q-Network (DQN) 
+$$
+Q(\cdot \vert \theta_{DQN}): \quad s \xrightarrow{\text{DQN}}   \begin{pmatrix} Q(s, a_1) \\ Q(s, a_2) \\ \vdots \\ Q(s, a_N) \end{pmatrix}
+$$
+to approximate the action-value function $Q^*(s,a)$.
 
-Note that the defined \ac{mdp} differs slightly from the one given by Caspar et al. \textcite{drausp_lion18}
-The requests are modeled in the state space, while in the original paper they are modeled in the action space by
----- hier nochmal nachschauen we das vom Kloster gemacht wurde und vergleichen -------
+We use standard DQN architecture as a baseline which tries to learn the action-value function $Q(s,a)$ without any structural knowledge about the problem. 
+
+\textbf{Comparison with the state/action space formulation in the DRAUSP paper.}
+\textcite{drausp_lion18} also formulate \acs{drausp} as an \acs{mdp}, but with a considerably
+leaner state space. Their state is simply the capacity vector
+$$s = (\hat C_1,\dots,\hat C_K) \in S = \{0,\dots,C_1\}\times\dots\times\{0,\dots,C_K\}$$ the
+time index $t$ is not part of the state vector at all, but only a separate, downward-counting step
+index of their recursion, indicating how many requests are still to arrive. In particular, the
+current request $[r,q]$ is \emph{not} contained in the state. Our state $s$ (Equation~\eqref{eq:state}), by contrast, contains $r$ and $q$
+explicitly, while our action is reduced to the lean start slot $a \in \{0,\dots,K\}$.
+Table~\ref{tab:mdp-comparison} summarizes this structural comparison; \emph{how} the two
+formulations are subsequently solved (exact dynamic programming vs.\ function approximation via
+\acs{dqn}) is discussed separately in the section on the DQN agent.
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{p{0.20\textwidth}p{0.36\textwidth}p{0.36\textwidth}}
+    \toprule
+     & \textbf{Paper} & \textbf{Our Approach} \\
+    \midrule
+    State    & $s_t = (\hat C_1,\dots,\hat C_K)$, $t$ a separate step index
+             & $s = [t,\hat C_1,\dots,\hat C_K,r,q_1,\dots,q_K]$ \\
+    Request  & embedded in the action set $A_s$
+             & embedded explicitly in the state \\
+    Action   & $a=[a_r,a_q]$: full, request-dependent $K$-vector per start position
+             & $a \in \{0,\dots,K\}$: only the start slot \\
+    \bottomrule
+  \end{tabular}
+  \caption{Comparison of the state/action space formulation in the DRAUSP paper
+    \parencite{drausp_lion18} and in our approach.}
+  \label{tab:mdp-comparison}
+\end{table}
+
+The paper's state space is insufficient for a Q-learning approach, because a Q-function $Q(s,a)$ is
+supposed to return one fixed value per state $s$ for every action $a$ -- but here, how good an
+action is depends crucially on which request is currently at hand.
+
+At every decision point, a Q-learning agent should be able to read off, directly from the state,
+how good each action is. This requires the state to include the request itself, so that the agent
+knows both the reward and the resource demand it is deciding about.
 
 
 \subsection{Zustands- und Aktionsraum}
@@ -205,312 +255,3 @@ in Abschnitt~\ref{subsec:monotonicity} postulierten DECREASING-Monotonie: Ein Pa
 bedeutet "kein Bedarf an dieser relativen Position" und wirkt im kalibrierten Modell wie eine
 Anfrage ohne jede Einschränkung an diesem Slot -- was korrekt ist, da dieser Slot vom Block der
 aktuellen Anfrage gar nicht betroffen ist.
-
-\textbf{Vergleich mit der Zustands-/Aktionsraum-Formulierung im DRAUSP-Paper.}
-\textcite{drausp_lion18} formulieren das DRAUSP ebenfalls als MDP, jedoch mit einem deutlich
-schlankeren Zustandsraum. Ihr Zustand ist rein der Kapazitätsvektor
-$s_t = cap = (\hat C_1,\dots,\hat C_K) \in S = \{0,\dots,C_1\}\times\dots\times\{0,\dots,C_K\}$;
-der Zeitindex $t$ ist dort kein Bestandteil des Zustandsvektors, sondern nur ein separater,
-rückwärtslaufender Stufenindex ihrer Rekursion. Insbesondere ist die aktuelle Anfrage $[r,q]$
-\emph{nicht} im Zustand enthalten -- sie bestimmt stattdessen direkt die Aktionsmenge $A_s$: Eine
-Aktion $a=[a_r,a_q]$ enthält bereits den auf eine konkrete Startposition verschobenen, gepaddeten
-Bedarfsvektor als vollen $K$-dimensionalen Vektor, und der Übergang $s_{t-1} = cap - a_q$ ist
-deterministisch. Unser Zustand $s$ (Gleichung~\eqref{eq:state}) enthält $r$ und $q$ dagegen
-explizit, während unsere Aktion auf den schlanken Startslot $a \in \{0,\dots,K\}$ reduziert ist.
-Tabelle~\ref{tab:mdp-comparison} fasst diese strukturelle Gegenüberstellung zusammen; \emph{wie}
-die beiden Formulierungen anschließend gelöst werden (exakte dynamische Programmierung vs.\
-Funktionsapproximation per DQN), wird gesondert im Abschnitt zum DQN-Agenten behandelt.
-
-\begin{table}[htbp]
-  \centering
-  \begin{tabular}{p{0.20\textwidth}p{0.36\textwidth}p{0.36\textwidth}}
-    \toprule
-     & \textbf{Paper} & \textbf{Unser Ansatz} \\
-    \midrule
-    Zustand  & $s_t = (\hat C_1,\dots,\hat C_K)$, $t$ separater Stufenindex
-             & $s = [t,\hat C_1,\dots,\hat C_K,r,q_1,\dots,q_K]$ \\
-    Anfrage  & steckt in der Aktionsmenge $A_s$
-             & steckt explizit im Zustand \\
-    Aktion   & $a=[a_r,a_q]$: voller, request-abhängiger $K$-Vektor pro Startposition
-             & $a \in \{0,\dots,K\}$: nur der Startslot \\
-    \bottomrule
-  \end{tabular}
-  \caption{Gegenüberstellung der Zustands-/Aktionsraum-Formulierung im DRAUSP-Paper
-    \parencite{drausp_lion18} und in unserem Ansatz.}
-  \label{tab:mdp-comparison}
-\end{table}
-Der Zustandsraum aus dem Paper funktioniert für einen RL-Ansatz mit Q-Funktion nicht, 
-weil eine Q-Funktion $Q(s,a)$ pro Zustand $s$ einen festen Wert für jede Aktion $a$ liefern soll 
-— aber der Wert einer Aktion hängt hier entscheidend davon ab, welche Anfrage gerade vorliegt.
-Mit dem zustandsraum, der nur die aktuellen Restkapazitäten berücksichtigt, weiß der Agwnt nicht, 
-welche Anfrage er gerade bewertet.
-
-Ein Q-Learning-Agent sollte bei jeder Entscheidung direkt aus dem Zustand ableiten können, wie gut jede Aktion ist.
-Dafür muss der Zustand die Anfrage enthalten, damit der Agent die Belohnung und den Ressourcenbedarf kennt.
-
-\subsection{Monotonicity in the Q-Function}
-\label{subsec:monotonicity}
-
-Für den in Gleichung~\eqref{eq:state} eingeführten Zustand $s$ lassen sich plausible
-monotone Beziehungen zwischen einzelnen Zustandsgrößen und dem optimalen $Q$-Wert postulieren:
-
-\begin{itemize}
-  \item $t$ \textbf{(DECREASING)}: Je mehr Zeit bereits verstrichen ist, desto weniger
-        zukünftige Anfragen können noch angenommen werden -- der erwartete Restwert sinkt.
-  \item $C_k$ \textbf{(INCREASING)}: Mehr Restkapazität einer Ressource kann den zukünftigen
-        Handlungsspielraum nur vergrößern, nie verkleinern.
-  \item $r$ \textbf{(INCREASING)}: Eine Anfrage mit höherer Belohnung ist bei sonst gleichen
-        Bedingungen nie schlechter zu bewerten als eine mit niedrigerer Belohnung.
-  \item $q_k$ \textbf{(DECREASING)}: Ein höherer Ressourcenbedarf der aktuellen Anfrage schränkt
-        die verbleibende Kapazität stärker ein und kann den Wert der Annahme nur verringern.
-  \end{itemize}
-
-Ein Standard-DQN (vgl.\ \texttt{standard\_dqn.py}) approximiert $Q(s,a)$ mit einem generischen
-Feedforward-Netz und hat keine Garantie, diese Beziehungen einzuhalten. Statt Monotonie nur als
-weichen Strafterm in der Verlustfunktion zu fordern, bauen wir sie \emph{strukturell} in die
-Netzwerkarchitektur ein: Ein \emph{Lattice-Netzwerk} approximiert eine mehrdimensionale Funktion
-durch (multi-)lineare Interpolation auf einem regelmäßigen Gitter aus lernbaren Stützwerten.
-Ist jeder Stützwert entlang einer Gitterachse monoton angeordnet, ist die gesamte interpolierte
-Funktion entlang dieser Achse garantiert monoton -- unabhängig vom Training. Dieses Prinzip wird
-in den Modellen \texttt{full\_lattice.py} und \texttt{deep\_lattice.py} umgesetzt und im Folgenden
-für das zweistufige \emph{Deep-Lattice}-Netzwerk beschrieben.
-
-\subsection{Deep Lattice Network Architektur}
-\label{subsec:deep-lattice}
-
-Ein einzelnes Lattice mit $d$ Eingängen besitzt $2^d$ lernbare Eckgewichte (bei Gittergröße~2 je
-Achse) und wird durch $d$-lineare Interpolation ausgewertet -- Abbildung~\ref{fig:lattice-cube}
-zeigt dies exemplarisch für $d=3$. Mit wachsendem $d$ wächst die Anzahl der Eckgewichte jedoch
-exponentiell ($2^d$), weshalb ein einzelnes Lattice über alle $2+2K$ Zustandsgrößen für DRAUSP-
-Instanzen mit mehreren Ressourcen $K$ schnell unpraktikabel wird (vgl.\ \texttt{full\_lattice.py}).
-Das \emph{Deep-Lattice}-Netzwerk (\texttt{deep\_lattice.py}) löst dies, indem es viele kleine
-3-Input-Lattices in zwei hintereinandergeschalteten Schichten kombiniert -- ähnlich einem tiefen
-neuronalen Netz, jedoch mit an jeder Schicht erhaltener End-to-End-Monotonie. Abbildung~\ref{fig:deep-lattice-architecture}
-skizziert die Architektur für $K=2$ Ressourcen.
-
-\textbf{Schicht 0 -- Kalibratoren.} Jedes Rohfeature ($t$, $C_k$, $r$, $q_k$) durchläuft einen
-eigenen \texttt{NumericalCalibrator}: eine stückweise lineare, monotone Funktion, die den Wert auf
-$[0,1]$ abbildet und dabei die in Abschnitt~\ref{subsec:monotonicity} festgelegte
-Monotonierichtung (INCREASING/DECREASING) ein für alle Mal kodiert. Alle nachfolgenden Schichten
-müssen dadurch nur noch \emph{increasing} sein.
-
-\textbf{Schicht 1 -- Intra-Resource-Lattice-Ensemble.} Für jede Ressource $k$ werden die
-kalibrierten Features zu drei fachlich motivierten 3er-Gruppen kombiniert:
-$A_k = [t, r, C_k]$ (Zeitdruck/Belohnung/Kapazität),
-$B_k = [C_k, q_k, r]$ (Kapazität/Bedarf/Belohnung) und
-$C_k = [t, C_k, q_k]$ (Zeitdruck/Kapazität/Bedarf).
-Jede Gruppe wird von \texttt{lattice\_units} vielen unabhängigen $2\times2\times2$-Lattices
-(Ensemble) verarbeitet, sodass Schicht~1 mehrere alternative nichtlineare, aber garantiert
-monotone Kombinationen dieser Größen lernen kann.
-
-\textbf{Zwischenkalibratoren.} Jeder einzelne Lattice-Output aus Schicht~1 erhält einen eigenen
-\texttt{NumericalCalibrator} (monoton \emph{increasing}), der ihn zurück auf $[0,1]$ normalisiert
--- notwendig, damit er in Schicht~2 wieder als gültige Gitterkoordinate verwendet werden kann.
-
-\textbf{Schicht 2 -- Cross-Resource-Lattices.} Während Schicht~1 nur Interaktionen
-\emph{innerhalb} einer Ressource $k$ modellieren kann, kombiniert Schicht~2 gezielt je einen
-kalibrierten Output aus Gruppe $A$, $B$ und $C$ unterschiedlicher Ressourcen $k$ zu neuen
-3-Input-Lattices. So kann das Netz z.\,B.\ lernen, wie die Kapazitätssituation von Ressource~1 mit
-dem Zeitdruck-Belohnungs-Profil von Ressource~2 zusammenwirkt -- eine Interaktion, die Schicht~1
-strukturell nicht abbilden kann. Ein rotierender Ressourcen-Offset erzeugt dabei genau $K$ solcher
-Tripel (statt aller $K^3$ möglichen Kombinationen), sodass Schicht~2 linear und nicht kubisch mit
-der Ressourcenzahl $K$ wächst.
-
-\textbf{Output-Layer.} Ein \texttt{Linear}-Layer aggregiert alle Schicht-2-Outputs zu einem
-$Q$-Wert pro Aktion. Seine Gewichte werden nach jedem Optimierungsschritt auf $\geq 0$ geklemmt
-(\texttt{apply\_constraints()}), sodass eine positive (monotone) Wirkung aus den vorangehenden
-Schichten nicht durch negative Gewichte im letzten Schritt umgekehrt werden kann. Damit ist
-$Q(s,a)$ end-to-end monoton in $t$, $C_k$, $r$ und $q_k$ -- durch die Architektur erzwungen, nicht
-nur durch das Training angestrebt.
-
-\begin{figure}[htbp]
-  \centering
-  \resizebox{\textwidth}{!}{%
-  \begin{tikzpicture}[
-      font=\small,
-      every node/.style={align=center},
-      inp/.style ={draw, circle, minimum size=7mm, fill=gray!10},
-      cal/.style ={draw, rounded corners, minimum width=13mm, minimum height=8mm, fill=blue!8},
-      latA/.style={draw, rounded corners, minimum width=17mm, minimum height=11mm, fill=red!15},
-      latB/.style={draw, rounded corners, minimum width=17mm, minimum height=11mm, fill=green!18},
-      latC/.style={draw, rounded corners, minimum width=17mm, minimum height=11mm, fill=orange!20},
-      cb/.style ={draw, rounded corners, minimum width=48mm, minimum height=9mm, fill=blue!8},
-      l2/.style ={draw, rounded corners, minimum width=22mm, minimum height=11mm, fill=violet!18},
-      outl/.style={draw, rounded corners, minimum width=34mm, minimum height=8mm, fill=gray!20},
-      qn/.style ={draw, circle, minimum size=9mm, fill=yellow!25},
-      >={Latex[length=2mm]}
-    ]
-
-    % ---------- Schicht 0: Rohfeatures ----------
-    \node[inp] (t)  at (0.0,0)  {$t$};
-    \node[inp] (c1) at (1.4,0)  {$C_1$};
-    \node[inp] (c2) at (2.8,0)  {$C_2$};
-    \node[inp] (r)  at (4.2,0)  {$r$};
-    \node[inp] (q1) at (5.6,0)  {$q_1$};
-    \node[inp] (q2) at (7.0,0)  {$q_2$};
-
-    % ---------- Schicht 0: Kalibratoren ----------
-    \node[cal] (calt)  at (0.0,-1.6) {cal$_t$\\\tiny DEC};
-    \node[cal] (calc1) at (1.4,-1.6) {cal$_{C_1}$\\\tiny INC};
-    \node[cal] (calc2) at (2.8,-1.6) {cal$_{C_2}$\\\tiny INC};
-    \node[cal] (calr)  at (4.2,-1.6) {cal$_r$\\\tiny INC};
-    \node[cal] (calq1) at (5.6,-1.6) {cal$_{q_1}$\\\tiny DEC};
-    \node[cal] (calq2) at (7.0,-1.6) {cal$_{q_2}$\\\tiny DEC};
-
-    \foreach \a/\b in {t/calt, c1/calc1, c2/calc2, r/calr, q1/calq1, q2/calq2}
-      \draw[->] (\a) -- (\b);
-
-    % ---------- Schicht 1: Lattice-Gruppen pro Ressource k ----------
-    \node[latA] (a1) at (0.7,-3.6) {$A_1$\\\tiny$[t,r,C_1]$};
-    \node[latB] (b1) at (2.1,-3.6) {$B_1$\\\tiny$[C_1,q_1,r]$};
-    \node[latC] (g1) at (3.5,-3.6) {$C_1$\\\tiny$[t,C_1,q_1]$};
-
-    \node[latA] (a2) at (4.9,-3.6) {$A_2$\\\tiny$[t,r,C_2]$};
-    \node[latB] (b2) at (6.3,-3.6) {$B_2$\\\tiny$[C_2,q_2,r]$};
-    \node[latC] (g2) at (7.7,-3.6) {$C_2$\\\tiny$[t,C_2,q_2]$};
-
-    \draw[->] (calt) -- (a1); \draw[->] (calr)  -- (a1); \draw[->] (calc1) -- (a1);
-    \draw[->] (calc1)-- (b1); \draw[->] (calq1) -- (b1); \draw[->] (calr)  -- (b1);
-    \draw[->] (calt) -- (g1); \draw[->] (calc1) -- (g1); \draw[->] (calq1) -- (g1);
-
-    \draw[->] (calt) -- (a2); \draw[->] (calr)  -- (a2); \draw[->] (calc2) -- (a2);
-    \draw[->] (calc2)-- (b2); \draw[->] (calq2) -- (b2); \draw[->] (calr)  -- (b2);
-    \draw[->] (calt) -- (g2); \draw[->] (calc2) -- (g2); \draw[->] (calq2) -- (g2);
-
-    \node[align=left] at (9.6,-3.6) {\scriptsize je $\times$ \texttt{lattice\_units}\\\scriptsize (Ensemble)};
-
-    % ---------- Zwischenkalibratoren ----------
-    \node[cb] (cb) at (3.85,-5.5) {Zwischenkalibratoren ($3KU$ Stück, je INC)};
-    \foreach \n in {a1,b1,g1,a2,b2,g2}
-      \draw[->] (\n) -- (cb);
-
-    % ---------- Schicht 2: Cross-Resource-Lattices ----------
-    \node[l2] (l2a) at (1.6,-7.4) {$L2_1$\\\tiny$(A_1,B_2,C_1)$};
-    \node[l2] (l2b) at (3.85,-7.4) {$L2_2$\\\tiny$(A_2,B_1,C_2)$};
-    \node[l2] (l2c) at (6.1,-7.4) {$\cdots$\\\tiny weitere Tripel};
-
-    \draw[->] (cb) -- (l2a);
-    \draw[->] (cb) -- (l2b);
-    \draw[->] (cb) -- (l2c);
-
-    % ---------- Output-Layer ----------
-    \node[outl] (out) at (3.85,-9.1) {Linear, Gewichte $\geq 0$};
-    \draw[->] (l2a) -- (out);
-    \draw[->] (l2b) -- (out);
-    \draw[->] (l2c) -- (out);
-
-    % ---------- Q-Werte ----------
-    \node[qn] (q0) at (2.6,-10.6) {$Q(s,a_0)$};
-    \node[qn] (q1o) at (5.1,-10.6) {$Q(s,a_1)$};
-    \draw[->] (out) -- (q0);
-    \draw[->] (out) -- (q1o);
-
-    % ---------- Schichtbeschriftungen ----------
-    \node[anchor=east, gray] at (-0.9,0)    {\scriptsize Input};
-    \node[anchor=east, gray] at (-0.9,-1.6) {\scriptsize Schicht 0};
-    \node[anchor=east, gray] at (-0.9,-3.6) {\scriptsize Schicht 1};
-    \node[anchor=east, gray] at (-0.9,-5.5) {\scriptsize Schicht 1$\to$2};
-    \node[anchor=east, gray] at (-0.9,-7.4) {\scriptsize Schicht 2};
-    \node[anchor=east, gray] at (-0.9,-9.1) {\scriptsize Output};
-
-  \end{tikzpicture}}
-  \caption{Skizze des \emph{Deep-Lattice}-Netzwerks für $K=2$ Ressourcen. Rohfeatures werden pro
-    Größe monoton kalibriert (Schicht~0), anschließend gruppenweise pro Ressource in kleinen
-    3-Input-Lattices kombiniert (Schicht~1, Gruppen $A/B/C$), erneut kalibriert und in
-    Cross-Resource-Lattices gemischt (Schicht~2), bevor ein nicht-negativer Linear-Layer die
-    finalen $Q$-Werte ausgibt. Jeder Pfeil überträgt einen skalaren, monoton kalibrierten Wert.}
-  \label{fig:deep-lattice-architecture}
-\end{figure}
-
-\begin{figure}[htbp]
-  \centering
-  \begin{tikzpicture}[scale=1.7, every node/.style={font=\scriptsize}]
-    % 2x2x2 Lattice als Einheitswürfel (schräge/kavalier Projektion)
-    \coordinate (000) at (0,0);
-    \coordinate (100) at (2,0);
-    \coordinate (010) at (0,2);
-    \coordinate (110) at (2,2);
-    \coordinate (001) at (0.9,0.6);
-    \coordinate (101) at (2.9,0.6);
-    \coordinate (011) at (0.9,2.6);
-    \coordinate (111) at (2.9,2.6);
-
-    % hintere Kanten (verdeckt)
-    \draw[gray, dashed] (001) -- (101) -- (111) -- (011) -- cycle;
-    \draw[gray, dashed] (000) -- (001);
-    \draw[gray, dashed] (100) -- (101);
-
-    % vordere/sichtbare Kanten
-    \draw[thick] (000) -- (100) -- (110) -- (010) -- cycle;
-    \draw[thick] (010) -- (011) -- (111) -- (110);
-    \draw[thick] (100) -- (101) -- (111);
-
-    % Eckgewichte (lernbare Parameter) -- Labels konsequent nach außen, weg vom Würfelinnern
-    \fill (000) circle (1.3pt); \node[below=2pt]        at (000) {$\theta_{000}$};
-    \fill (100) circle (1.3pt); \node[below right=-2pt] at (100) {$\theta_{100}$};
-    \fill (010) circle (1.3pt); \node[above left=-2pt]  at (010) {$\theta_{010}$};
-    \fill (110) circle (1.3pt); \node[above right=-2pt] at (110) {$\theta_{110}$};
-    \fill (001) circle (1.3pt); \node[left=2pt]         at (001) {$\theta_{001}$};
-    \fill (101) circle (1.3pt); \node[right=2pt]        at (101) {$\theta_{101}$};
-    \fill (011) circle (1.3pt); \node[above=2pt]        at (011) {$\theta_{011}$};
-    \fill (111) circle (1.3pt); \node[above right=2pt]  at (111) {$\theta_{111}$};
-
-    % interpolierter Abfragepunkt im Innern
-    \coordinate (p) at (1.5,1.6);
-    \fill[red] (p) circle (1.5pt);
-    \node[red, above right=1pt] at (p) {$\hat Q = f(x_1,x_2,x_3)$};
-    \draw[red, densely dotted] (p) -- ($(p) - (0,1.6)$);
-    \draw[red, densely dotted] (p) -- ($(p) - (1.5,0)$);
-
-    % Achsen-Indikator, separat unten links vom Würfel, damit nichts überlappt
-    \begin{scope}[shift={(-1.1,-0.4)}]
-      \draw[->, thick] (0,0) -- (0.8,0) node[below, xshift=1pt] {$x_1$};
-      \draw[->, thick] (0,0) -- (0,0.8) node[left] {$x_2$};
-      \draw[->, thick] (0,0) -- (0.42,0.28) node[below right=-2pt] {$x_3$};
-    \end{scope}
-  \end{tikzpicture}
-
-  \bigskip
-  {\scriptsize $x_1$: z.\,B.\ $t_{\text{cal}} \in [0,1]$ \quad
-   $x_2$: z.\,B.\ $r_{\text{cal}} \in [0,1]$ \quad
-   $x_3$: z.\,B.\ $C_{k,\text{cal}} \in [0,1]$}
-  \caption{Ein einzelnes 3-Input-Lattice (Gittergröße $2\times2\times2$) aus Schicht~1. Die acht
-    Eckgewichte $\theta_{ijk}$ sind lernbare Parameter; der Funktionswert an einem beliebigen Punkt
-    im Würfel $[0,1]^3$ ergibt sich durch trilineare Interpolation zwischen den Ecken. Sind die
-    Eckgewichte entlang jeder Achse monoton angeordnet (z.\,B.\ $\theta_{0**} \leq \theta_{1**}$),
-    ist die interpolierte Funktion entlang dieser Achse garantiert monoton -- dies wird während
-    des Trainings durch \texttt{apply\_constraints()} sichergestellt.}
-  \label{fig:lattice-cube}
-\end{figure}
-
-\textbf{Berechnung des Funktionswerts.} Der Wert $\hat Q$ an einem beliebigen Punkt
-$(x_1,x_2,x_3) \in [0,1]^3$ im Würfel ist \emph{keine} achsenweise Multiplikation eines
-einzelnen kalibrierten Werts mit einem einzelnen Eckgewicht, sondern eine gewichtete Summe über
-\emph{alle} $2^3=8$ Ecken. Das Gewicht jeder Ecke ist dabei das Produkt der drei
-Achsen-Interpolationsfaktoren, je nachdem auf welcher Seite jeder Achse die Ecke liegt (Faktor
-$x_a$ auf der $1$-Seite, Faktor $1-x_a$ auf der $0$-Seite):
-\begin{equation}
-  \label{eq:trilinear}
-  \hat Q(x_1,x_2,x_3) = \sum_{i,j,k \in \{0,1\}}
-    \big[i\,x_1 + (1-i)(1-x_1)\big]\,
-    \big[j\,x_2 + (1-j)(1-x_2)\big]\,
-    \big[k\,x_3 + (1-k)(1-x_3)\big]\;
-    \theta_{ijk}.
-\end{equation}
-Diese acht Koeffizienten summieren sich stets zu $1$, sodass $\hat Q$ immer eine Konvexkombination
-der acht Eckgewichte ist (\emph{trilineare Interpolation}). Zur Veranschaulichung das
-zweidimensionale Analogon mit nur vier Ecken $\theta_{00}, \theta_{10}, \theta_{01}, \theta_{11}$:
-\[
-  \hat Q(x_1,x_2) = (1-x_1)(1-x_2)\,\theta_{00} + x_1(1-x_2)\,\theta_{10}
-                   + (1-x_1)x_2\,\theta_{01} + x_1 x_2\,\theta_{11}.
-\]
-Für $x_1=x_2=0$ liefert dies exakt $\theta_{00}$, für $x_1=x_2=1$ exakt $\theta_{11}$; dazwischen
-wird bilinear (bzw.\ im 3-Input-Fall trilinear) interpoliert. Implementiert ist dies als
-äußeres Produkt der achsenweisen Gewichte $(1-x_a, x_a)$ gefolgt von einem Skalarprodukt mit dem
-Eckgewichts-Vektor (\texttt{pytorch\_lattice/layers/lattice.py},
-\texttt{\_compute\_hypercube\_interpolation}).
-
-Als Beispielrechnung (siehe \texttt{models/MODEL\_ARCHITECTURES.md}) ergibt sich für $K=2$
-Ressourcen, $8$~Kalibrator-Stützpunkte, $U=4$ Ensemble-Einheiten in Schicht~1 und $U_2=2$ in
-Schicht~2 folgende Parameteraufteilung: Input-Kalibratoren $48$, Schicht~1 $192$,
-Zwischenkalibratoren $192$, Schicht~2 $32$ und Output-Layer $10$ Parameter, insgesamt $474$.
