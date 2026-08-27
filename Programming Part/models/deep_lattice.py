@@ -37,6 +37,13 @@ class DeepLatticeNetwork(nn.Module):
         r   : INCREASING (höherer Reward -> besser)
         q_k : DECREASING (höherer Bedarf -> schlechter)
 
+    Ensemble-Aggregation: Jede Gruppe (A/B/C) und Ressource k wird von einem Lattice
+    mit `lattice_units` (U) parallelen Ensemble-Membern ausgewertet; die U Outputs
+    werden direkt danach über dim=1 gemittelt (arithmetisches Mittel monotoner
+    Funktionen ist selbst monoton). Dadurch fließt die Information aller U Member in
+    genau EINEN Wert pro Gruppe/Ressource, statt dass Schicht 2 nur einen einzelnen,
+    per Rotation ausgewählten Member sieht und der Rest ungenutzt verworfen wird.
+
     Nach Calibrierung in Schicht 1 sind alle Outputs in [0,1] und implizit INCREASING
     (Richtung ist in den Calibratoren absorbiert). Schicht 2 verwendet daher nur
     INCREASING Monotonicities.
@@ -133,14 +140,17 @@ class DeepLatticeNetwork(nn.Module):
         ])
 
         # ------------------------------------------------------------------
-        # 3. Zwischen-Calibratoren: ein eigener pro Lattice-Output aus Schicht 1
+        # 3. Zwischen-Calibratoren: ein eigener pro (Gruppe, Ressource)
         #
-        # Schicht-1 produziert pro k: lattice_units (U) Outputs für A, B, C
-        # → 3 * K * lattice_units Calibratoren insgesamt
+        # Schicht-1 produziert pro k und Gruppe lattice_units (U) Ensemble-Outputs,
+        # die in forward() bereits über die U Units gemittelt werden, bevor sie
+        # hier ankommen → nur noch 3 * K Calibratoren insgesamt (nicht 3*K*U),
+        # und jeder davon ist von ALLEN U Ensemble-Membern der jeweiligen
+        # Gruppe/Ressource informiert statt nur von einem einzelnen.
         # Alle INCREASING, da die Monotonie-Richtung bereits in Schicht 1 kodiert ist
         # ------------------------------------------------------------------
-        # Anzahl Outputs Schicht 1: 3 Gruppen * K Ressourcen * lattice_units
-        n_l1_outputs = 3 * K * lattice_units
+        # Anzahl Outputs Schicht 1 nach Ensemble-Mittelung: 3 Gruppen * K Ressourcen
+        n_l1_outputs = 3 * K
         self.cal_between = nn.ModuleList([
             NumericalCalibrator(
                 input_keypoints=np.linspace(0.0, 1.0, keypoints),
@@ -156,21 +166,23 @@ class DeepLatticeNetwork(nn.Module):
         # Jedes Lattice bekommt 3 Inputs: je einen Wert aus Gruppe A, B, C
         # von jeweils möglichst unterschiedlichen Ressourcen k.
         #
-        # Index-Schema für cal_between / Schicht-1-Outputs:
-        #   out_A[k][u] → Index: 0*K*U + k*U + u
-        #   out_B[k][u] → Index: 1*K*U + k*U + u
-        #   out_C[k][u] → Index: 2*K*U + k*U + u
+        # Index-Schema für cal_between / Schicht-1-Outputs (nach Ensemble-Mittelung
+        # ist jede (Gruppe, Ressource)-Kombination bereits genau EIN Wert):
+        #   out_A[k] → Index: 0*K + k
+        #   out_B[k] → Index: 1*K + k
+        #   out_C[k] → Index: 2*K + k
         #
         # _build_cross_resource_triplets erzeugt genau K Tripel per
         # rotierendem Offset (kA=i, kB=i+1, kC=i+2 mod K) statt aller K^3
         # möglichen (kA,kB,kC)-Kombinationen — sonst würde Schicht 2 kubisch
         # statt linear mit K wachsen (bei K=5 wären das 125 statt 5 Lattices).
         # Bei K>=3 sind kA,kB,kC dadurch immer drei verschiedene Ressourcen,
-        # bei K<3 die maximal mögliche Anzahl. Die u-Indizes rotieren
-        # ebenfalls, damit nicht jedes Tripel denselben Ensemble-Member aus
-        # Schicht 1 sieht.
+        # bei K<3 die maximal mögliche Anzahl. Da jede (Gruppe, Ressource)-
+        # Kombination bereits alle U Ensemble-Member gemittelt enthält, deckt
+        # dies automatisch die volle Schicht-1-Information ab — anders als bei
+        # einer reinen Index-Auswahl bleibt hier nichts ungenutzt.
         # ------------------------------------------------------------------
-        self.l2_triplets = self._build_cross_resource_triplets(K, lattice_units)
+        self.l2_triplets = self._build_cross_resource_triplets(K)
         n_l2_lattices = len(self.l2_triplets)
 
         mono_L2 = [Monotonicity.INCREASING] * 3  # Richtung steckt bereits in cal_between
@@ -193,7 +205,7 @@ class DeepLatticeNetwork(nn.Module):
     # ----------------------------------------------------------------------
 
     @staticmethod
-    def _build_cross_resource_triplets(K: int, U: int) -> list:
+    def _build_cross_resource_triplets(K: int) -> list:
         """
         Baut Tripel von Schicht-1-Output-Indizes für die Cross-resource Schicht 2.
 
@@ -201,24 +213,24 @@ class DeepLatticeNetwork(nn.Module):
           - idx_A aus Gruppe A, idx_B aus Gruppe B, idx_C aus Gruppe C
           - k-Werte möglichst verschieden (cross-resource): bei K>=3 immer 3
             verschiedene Ressourcen, bei K<3 die maximal mögliche Anzahl
-          - u-Werte rotieren, um verschiedene Ensemble-Member zu mischen
 
         Erzeugt genau K Tripel (rotierender Offset), nicht alle K^3
         Kombinationen aus (k_A, k_B, k_C) — sonst wächst Schicht 2 kubisch
-        mit der Ressourcenzahl K statt linear.
+        mit der Ressourcenzahl K statt linear. Da jede (Gruppe, Ressource)-
+        Kombination bereits über alle lattice_units Ensemble-Member gemittelt
+        wurde (siehe forward()), wird durch die K Tripel jede Kombination
+        genau einmal verwendet — keine Ensemble-Information geht verloren.
 
         Index-Formel:
-          Gruppe g ∈ {0,1,2}, Ressource k ∈ {0..K-1}, Unit u ∈ {0..U-1}
-          → flat_index = g * K * U + k * U + u
+          Gruppe g ∈ {0,1,2}, Ressource k ∈ {0..K-1} → flat_index = g * K + k
         """
-        def idx(g, k, u):
-            return g * K * U + k * U + u
+        def idx(g, k):
+            return g * K + k
 
         triplets = []
         for offset in range(K):
             kA, kB, kC = offset % K, (offset + 1) % K, (offset + 2) % K
-            uA, uB, uC = offset % U, (offset + 1) % U, (offset + 2) % U
-            triplets.append((idx(0, kA, uA), idx(1, kB, uB), idx(2, kC, uC)))
+            triplets.append((idx(0, kA), idx(1, kB), idx(2, kC)))
 
         return triplets
 
@@ -349,8 +361,14 @@ class DeepLatticeNetwork(nn.Module):
         # das alle lattice_units Ensemble-Outputs in einem Aufruf liefert
         # (die drei Inputs sind für alle Units identisch, daher genügt ein
         # unsqueeze(1) statt eines echten repeats über die units-Dimension).
+        # Die U Ensemble-Outputs werden direkt danach über dim=1 gemittelt
+        # (arithmetisches Mittel monotoner Funktionen bleibt monoton), damit
+        # jede (Gruppe, Ressource)-Kombination zu GENAU EINEM Wert wird, der
+        # von allen U Membern informiert ist -- statt dass Schicht 2 später
+        # nur einen einzelnen, per Rotation ausgewählten Member sieht und
+        # der Rest ungenutzt bleibt.
         # Reihenfolge der Outputs: alle A-Outputs (k=0..K-1), dann B, dann C
-        # → Flat-Vektor der Länge 3*K*U für cal_between
+        # → Flat-Vektor der Länge 3*K für cal_between
         # ------------------------------------------------------------------
         out_A, out_B, out_C = [], [], []
         for k in range(K):
@@ -361,13 +379,14 @@ class DeepLatticeNetwork(nn.Module):
             inp_B = torch.cat([ck, qk, r_cal],    dim=1).unsqueeze(1)
             inp_C = torch.cat([t_cal, ck, qk],    dim=1).unsqueeze(1)
 
-            # (B, lattice_units) pro Gruppe und k
-            out_A.append(self.lattices_A[k](inp_A).float())
-            out_B.append(self.lattices_B[k](inp_B).float())
-            out_C.append(self.lattices_C[k](inp_C).float())
+            # (B, lattice_units) pro Gruppe und k, über die Ensemble-Dimension
+            # gemittelt auf (B, 1)
+            out_A.append(self.lattices_A[k](inp_A).float().mean(dim=1, keepdim=True))
+            out_B.append(self.lattices_B[k](inp_B).float().mean(dim=1, keepdim=True))
+            out_C.append(self.lattices_C[k](inp_C).float().mean(dim=1, keepdim=True))
 
-        # Flat-Vektor: (B, 3*K*U)
-        # Reihenfolge: [A_k0_u0..u3, A_k1_u0..u3, B_k0..., C_k0...]
+        # Flat-Vektor: (B, 3*K)
+        # Reihenfolge: [A_k0, A_k1, ..., B_k0, ..., C_k0, ...]
         l1_flat = torch.cat(out_A + out_B + out_C, dim=1)
 
         # ------------------------------------------------------------------
@@ -474,28 +493,34 @@ class DeepLatticeNetwork(nn.Module):
 #   Pro Gruppe und k gibt es `lattice_units` unabhängige Lattices (Ensemble),
 #   die denselben Input bekommen aber verschiedene Funktionen lernen können.
 #   lattice_units := Anzahl der Lattice Blöcke pro Gruppe und Ressource k (z.B. 4)
+#   Die U Ensemble-Outputs werden direkt im Anschluss über dim=1 gemittelt
+#   (arithmetisches Mittel monotoner Funktionen bleibt monoton), sodass pro
+#   Gruppe/Ressource genau EIN Wert entsteht, der alle U Member berücksichtigt
+#   — sonst würde Schicht 2 später nur einen einzelnen Member sehen und der
+#   Rest wäre ungenutzt.
 #
-#   Ausgabe pro k: 3 * lattice_units Skalare  ∈ ℝ  (noch nicht in [0,1])
-#   Gesamtausgabe Schicht 1: 3 * K * lattice_units Skalare
-#   Parameter: 3 * K * lattice_units * 8
+#   Ausgabe pro k: 3 Skalare (nach Ensemble-Mittelung)  ∈ ℝ  (noch nicht in [0,1])
+#   Gesamtausgabe Schicht 1: 3 * K Skalare
+#   Parameter: 3 * K * lattice_units * 8   (Lattice-Gewichte selbst sind
+#     weiterhin lattice_units-fach vorhanden — nur die Ausgabe wird gemittelt)
 #
-#   Flacher Index eines Outputs:
-#     Gruppe g ∈ {0=A, 1=B, 2=C}, Ressource k, Unit u
-#     → flat_idx = g * K * U + k * U + u
+#   Flacher Index eines Outputs (nach Mittelung):
+#     Gruppe g ∈ {0=A, 1=B, 2=C}, Ressource k
+#     → flat_idx = g * K + k
 #
 # -----------------------------------------------------------------------------
-# SCHICHT 1→2 — Zwischen-Calibratoren  (ein eigener pro L1-Output)
+# SCHICHT 1→2 — Zwischen-Calibratoren  (ein eigener pro (Gruppe, Ressource))
 # -----------------------------------------------------------------------------
 #
-#   Jeder der 3*K*U Schicht-1-Outputs bekommt einen eigenen INCREASING
-#   NumericalCalibrator mit Keypoints in [0,1].
+#   Jeder der 3*K (ensemble-gemittelten) Schicht-1-Outputs bekommt einen
+#   eigenen INCREASING NumericalCalibrator mit Keypoints in [0,1].
 #   Dieser re-normalisiert den Output zurück auf [0,1], damit Schicht 2
 #   ihn als gültige Gitterkoordinate verwenden kann.
 #
 #   Da die Monotonie-Richtung bereits durch die Input-Calibratoren kodiert
 #   ist, genügt INCREASING für alle Zwischen-Calibratoren.
 #
-#   Parameter: 3 * K * U * P
+#   Parameter: 3 * K * P
 #
 # -----------------------------------------------------------------------------
 # SCHICHT 2 — Cross-resource Lattices
@@ -506,17 +531,18 @@ class DeepLatticeNetwork(nn.Module):
 #   mischen die Schicht-2-Lattices bewusst Outputs verschiedener
 #   Gruppen AND verschiedener Ressourcen.
 #
-#   Jedes Tripel hat die Form (A_kA_uA, B_kB_uB, C_kC_uC):
+#   Jedes Tripel hat die Form (A_kA, B_kB, C_kC):
 #     — immer eine aus jeder Gruppe (A, B, C)
 #     — kA, kB, kC bei K>=3 immer drei verschiedene Ressourcen
 #       (rotierender Offset i, i+1, i+2 mod K), bei K<3 die maximal
 #       mögliche Anzahl
-#     — rotierende Unit-Indizes (verschiedene Ensemble-Member)
 #
 #   _build_cross_resource_triplets erzeugt genau K Tripel (n_triplets = K),
 #   nicht alle K^3 möglichen (kA,kB,kC)-Kombinationen — sonst würde Schicht 2
 #   kubisch statt linear mit der Ressourcenzahl K wachsen (bei K=5 z.B. 125
-#   statt 5 Lattices).
+#   statt 5 Lattices). Da jede (Gruppe, Ressource)-Kombination bereits über
+#   alle lattice_units Ensemble-Member gemittelt wurde, deckt jedes Tripel-
+#   Element automatisch die volle Schicht-1-Information ab.
 #
 #   Dadurch kann Schicht 2 lernen, wie z.B. die Kapazitätssituation
 #   von Ressource 1 mit dem Zeitdruck-Reward-Profil von Ressource 2
@@ -547,9 +573,9 @@ class DeepLatticeNetwork(nn.Module):
 #
 #   Input-Calibratoren  (2+2*2)*8         =  48
 #   Lattice Schicht 1   3*2*4*8           = 192
-#   Zwischen-Calibrat.  3*2*4*8           = 192
+#   Zwischen-Calibrat.  3*2*8             =  48
 #   Lattice Schicht 2   K=2 Triplets*2*8  =  32
 #   Output-Layer        (4+1)*2           =  10
-#                                    Σ  = 474
+#                                    Σ  = 330
 #
 # =============================================================================
