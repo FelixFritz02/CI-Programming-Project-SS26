@@ -2,7 +2,7 @@
 \label{sec:rl-approach}
 
 TODO: Belohnungsfunktion, DQN-Agent (Trainingsschleife, Replay-Buffer, Zielnetzwerk, $\epsilon$-greedy).
-
+\subsection{Modeling DRAUSP as a Markov Decision Process}
 To use reinforcement learning techniques for modeling the \ac{drausp}, first of all we need to define
 a \ac{mdp} that represents the problem. We define a state space,an action space and a transition function: 
 
@@ -101,28 +101,9 @@ Selecting an infeasible action, terminates the episode and yields a large negati
 \textbf{Objective.} 
 Given a MDP the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes the expected cumulative reward over the decision horizon. In our case, the objective is to maximize the total revenue over the decision horizon by learning an acceptance-and-scheduling policy that maps states to actions.
 \begin{equation*}
-      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{\infty}\gamma^{t} r_t\Bigg]
+      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{T_d}\gamma^{t} r_t\Bigg]
   \end{equation*}
 Solving this optimization directly is a hard task because we have to find the optimal policy $\pi^*$ over the whole state space and the policy $\pi$ is itself part of the expectation. Instead, we will use Q-learning to learn the optimal action-value function $Q^*(s,a)$, which allows us to derive the optimal policy $\pi^*$ by acting greedily with respect to it.
-
-\textbf{(Deep) Q-Learning.} 
-In Q-learning, we learn the optimal action-value function
-\[
-  Q^*(s,a) = \max_\pi \; \mathbb{E}\Big[\, \sum_{t'=t}^{T_d} \gamma^{t'-t} \cdot \mathcal{R}(s_{t'}, a_{t'}) \;\Big|\; s_t = s,\, a_t = a \,\Big].
-\]
-Once $Q^*$ is known (or
-approximated by a trained network), the optimal policy follows directly by acting greedily with
-respect to it:
-\[
-  \pi^*(s) = \arg\max_{a \in \mathcal{A}} Q^*(s,a).
-\]
-Remark that Q-Learning suffers from the curse of dimensionality, since the state space grows exponentially with the number of resources $K$ and the number of requests $T_d$. Therefore, we will use a Deep Q-Network (DQN) 
-$$
-Q(\cdot \vert \theta_{DQN}): \quad s \xrightarrow{\text{DQN}}   \begin{pmatrix} Q(s, a_1) \\ Q(s, a_2) \\ \vdots \\ Q(s, a_N) \end{pmatrix}
-$$
-to approximate the action-value function $Q^*(s,a)$.
-
-We use standard DQN architecture as a baseline which tries to learn the action-value function $Q(s,a)$ without any structural knowledge about the problem. 
 
 \textbf{Comparison with the state/action space formulation in the DRAUSP paper.}
 \textcite{drausp_lion18} also formulate \acs{drausp} as an \acs{mdp}, but with a considerably
@@ -163,6 +144,62 @@ At every decision point, a Q-learning agent should be able to read off, directly
 how good each action is. This requires the state to include the request itself, so that the agent
 knows both the reward and the resource demand it is deciding about.
 
+\subsection{Learning the optimal policy via Q-learning}
+In Q-learning, we try to learn the optimal action-value function
+\[
+  Q^*(s,a) = \max_\pi \; \mathbb{E}\Big[\, \sum_{t'=t}^{T_d} \gamma^{t'-t} \cdot \mathcal{R}(s_{t'}, a_{t'}) \;\Big|\; s_t = s,\, a_t = a \,\Big],
+\]
+which should express the expected cumulative reward of taking action $a$ in state $s$ and then following the optimal policy $\pi^*$ thereafter.
+Once $Q^*$ is known (or
+approximated by a trained network), the optimal policy follows directly by acting greedily with
+respect to it:
+\[
+  \pi^*(s) = \arg\max_{a \in \mathcal{A}} Q^*(s,a).
+\]
+Remark that Q-Learning suffers from more complex instances, since tabular data becomes intractable with increasing complexity. Therefore, we will use a Deep Q-Network (DQN) 
+$$
+Q(\cdot \vert \theta_{DQN}): \quad s \xrightarrow{\text{DQN}}   \begin{pmatrix} Q(s, a_1) \\ Q(s, a_2) \\ \vdots \\ Q(s, a_N) \end{pmatrix}
+$$
+to approximate the action-value function $Q^*(s,a)$.
+We use standard DQN architecture as a baseline which tries to learn the action-value function $Q(s,a)$ without any structural knowledge about the problem. 
+\subsubsection{Loss function}
+The parameters $\theta_{DQN}$ of the DQN are updated by minimizing a loss function. We use the standard Bellman update rule:
+\[
+  Q(s_t, a_t) \leftarrow r_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a'),
+\]
+and define the loss function as the mean squared error between the current Q-value and the target Q-value:
+\[
+  L(\theta_{DQN}) = \sum_{(s_t, a_t, r_{t+1}, s_{t+1}) \in \mathcal{D'}} \Big[ \big( Q(s_t, a_t \vert \theta_{DQN}) - (r_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a' \vert \theta_{DQN})) \big)^2 \Big],
+\]
+where $\mathcal{D'}$ is a random sample from the replay buffer that stores the agent's experiences $(s_t, a_t, r_{t+1}, s_{t+1})$.
+\subsubsection{Action Masking}
+Trying to learn the action-value function $Q(s,a)$ with the defined state and action space from above,
+we ran into the problem that the agent often chooses invalid actions. Despite violating an invalid action by a highly negative reward, the agent
+still chooses invalid actions in upcoming decision epochs. This is because the agent does not know which actions are valid and need to learn this from the reward signal too.
+We face this problem by using action masking, which allows us to mask out invalid actions from the action space. Doing so, we use the set of valid actions $\mathcal{A}_s^{\text{valid}}$ defined in the previous section,
+and adapt the Q-function as follows:
+\[
+  Q_{\text{action masked}}(s,a) = \begin{cases}
+    Q(s,a), & \text{if } a \in \mathcal{A}_s^{\text{valid}} \\
+    -\infty, & \text{if } a \notin \mathcal{A}_s^{\text{valid}}
+  \end{cases}
+\]
+We will use this action-masked Q-function in the following sections to learn the optimal policy $\pi^*$, but still name it $Q(s,a)$.
+Note that deciding only on valid actions is rather intuitive, since the decision maker should never select an invalid action, and the optimal policy $\pi^*$ will never select an invalid action either.
+\subsubsection{$\epsilon$-Greedy and Adaptions}
+For balancing exploitation and exploration, we use an $\epsilon$-greedy policy, which selects a random action with probability $\epsilon$ and the action given by the Q-function with probability $1-\epsilon$.
+$\epsilon$ is decayed over time, starting with a high value to encourage exploration and gradually decreasing to a lower value to favor exploitation of the learned policy.
+The evaluation of the agent is done with $\epsilon=0$, meaning that the agent always selects the action with highest (approximated) $Q$-value.
+As mentioned above we select an action $a \in \mathcal{A}_s^{\text{valid}}$ randomly in the exploration phase. Hence, each action will be selected 
+with probability $\frac{1}{|\mathcal{A}_s^{\text{valid}}|} = \frac{1}{K-l+2}$, where $l$ is the length of the current request. 
+Note that the probability of rejecting a request is $\frac{1}{K-l+2}$, which is rather small for small requests. This leads to 
+a bias towards accepting requests, which is not optimal in the long run, especially when the time horizon $T_d$ is long and the capacities $C_k$ are limited. 
+We will never have the chance to accept a request, which is deep in the future, if we accept too many requests in the beginning.\\
+To counteract this bias, we adapt the $\epsilon$-greedy policy to select the reject action with a higher probability than the other actions.
+We define a parameter $\alpha \in [0,1]$ which defines the probability of selecting the reject action in the exploration phase. The probability of selecting a valid action $a \in \mathcal{A}_s^{\text{valid}} \setminus \{0\}$ is then given by
+\[
+  P(a) = \frac{1-\alpha}{|\mathcal{A}_s^{\text{valid}}|-1} = \frac{1-\alpha}{K-l+1}.
+\]
 
 \subsection{Zustands- und Aktionsraum}
 \label{subsec:state-action}
