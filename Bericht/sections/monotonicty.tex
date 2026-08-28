@@ -7,36 +7,40 @@ For the state $s$ introduced in Equation~\eqref{eq:state}, plausible monotone re
 
 \begin{itemize}
   \item $t$ \textbf{(DECREASING)}: The more time has already elapsed, the fewer future requests
-        can still be accepted -- the expected remaining value decreases.
-  \item $C_k$ \textbf{(INCREASING)}: More remaining capacity of a resource increases the room for future requests and can only increase the expected remaining value.
+        can still be accepted -- the expected remaining reward decreases.
+  \item $C_k$ \textbf{(INCREASING)}: More remaining capacity of a resource increases the room for accepting future requests and can only increase the expected remaining rewards.
   \item $r$ \textbf{(INCREASING)}: A request with higher reward should never
         be valued worse than one with lower reward.
   \item $q_k$ \textbf{(DECREASING)}: A higher resource demand of the current request restricts the
-        remaining capacity more strongly and can only decrease the value of accepting it.
+        remaining capacity more strongly and can only decrease the future reward, when accepted.
   \end{itemize}
 
 A standard DQN (cf.\ \texttt{standard\_dqn.py}) approximates $Q(s,a)$ with a generic feedforward
-network and has no guarantee of respecting these relationships. 
+network and has no guarantee of respecting those relationships. 
 
 To make use of this domain knowledge, we exploit to enforce the monotonicity relations \textit{structurally} in the network architecture, rather than hoping a generic network learns them. Remark that this is a stronger approach than simply encouraging monotonicity as a soft penalty term in the loss function. 
 
-In this chapter we \textit{(irst examine to what extent the monotonicity relations are respected by a standard DQN and then)} introduce a special network architecture, that enforces them structurally, the Lattice Network.
+-------------Monotomitest erklären!!-----------------
 
 
-\subsection{Lattice Network}
+In this chapter we \textit{(first examine to what extent the monotonicity relations are respected by a standard DQN and then)} introduce a special network architecture, that enforces them structurally. This leads us to so called Lattice Networks.
+
+
+\subsection{Lattice Layers}
 \label{subsec:lattice}
 
-As mentioned above, the central idea is that we try to use the structure of the DRAUSP problem directly instead of expecting a generic function approximator to discover it from data alone. A natural way to encode this structure is the lattice architecture: 
+As mentioned above, the central idea is to use the structural information of the \ac{drausp} problem directly instead of expecting a generic function approximator to discover it from data alone. A natural way to encode this structure is the lattice architecture: 
 \vspace{0.5cm}
 
 \textbf{Calibration.} 
-Each input feature is first passed through a \textit{monotone calibration function}, which maps it into a normalized range $[0,1]$ while preserving its direction of monotonicity. Remark that by this calibration step, features with decreasing monotonicity (e.g., $t$ and $q_k$) are flipped, so that all subsequent layers only need to be increasing.
+Each input feature is first passed through a \textit{monotone calibration function}, which maps it into a normalized range $[0,1]$ while preserving its direction of monotonicity. 
+Remark that by this calibration step, features with decreasing monotonicity (e.g., $t$ and $q_k$) are flipped, so that all subsequent layers only need to ensure monotonicity in increasing direction.
 
 \textbf{Lattice.}
-The resulting values of the calibrated featureare are then combined by a multi-dimensional interpolation rule over a learned grid. 
+The resulting values of the calibrated features are combined by a multi-dimensional interpolation rule over a learned grid. 
 In other words, the network does not just learn arbitrary nonlinear dependencies, it learns a monotone function over the input space. 
 
-A single lattice with $d$ inputs has $2^d$ learnable corner weights (at grid size~2 per axis) and is evaluated via $d$-linear interpolation. Figure~\ref{fig:lattice-cube} illustrates this for $d=3$. 
+A single lattice with $d$ inputs has $2^d$ learnable corner weights (assuming a grid size of 2 per axis) and is evaluated via $d$-linear interpolation. Figure~\ref{fig:lattice-cube} illustrates this for $d=3$. 
 
 
 \textbf{Computing the function value.} The output value $\hat{Q}$ of a lattice for the calibrated inputs
@@ -56,9 +60,9 @@ To illustrate, consider the two-dimensional case  with the four corner weights $
 
 Take care of the calibration step which is essential: each raw quantity ($t$, $C_k$, $r$, $q_k$) is transformed by a monotone 	\textit{NumericalCalibrator} into $[0,1]$, so that increasing and decreasing variables can be handled by the same interpolation machinery. 
 
-However, as $d$ grows, the number of corner weights grows exponentially ($2^d$), which makes a single lattice over all $2+2K$ state components impractical for DRAUSP instances with several resources $K$ (cf.\ \texttt{full\_lattice.py}).
+However, as $d$ grows, the number of corner weights grows exponentially ($2^d$), which makes a single lattice over all $2+2K$ state components intractable for \ac{drausp} instances with several resources $K$ (cf.\ \texttt{full\_lattice.py}).
 
-To retain the benefits of the lattice principle while scaling to larger state spaces, we use the \emph{Deep Lattice} idea (\texttt{deep\_lattice.py}) inspired by \ref{you2017}.
+To retain the benefits of the lattice principle while scaling to larger state spaces, we use the \emph{Deep Lattice} idea (\texttt{deep\_lattice.py}) inspired by \textcite{you2017}.
 
 \begin{figure}[htbp]
   \centering
@@ -142,7 +146,7 @@ Each group is processed by \texttt{lattice\_units} many independent $2\times2\ti
 (an ensemble), so that Layer~1 can learn several alternative nonlinear, but guaranteed monotonic,
 combinations of these quantities. 
 For each lattice, the $2^3=8$ corner weights of each lattice are learned independently, and the output is a single scalar per lattice unit.
-We average the outputs of the \texttt{lattice\_units} many ensemble members of each group by taking the arithmetic meanto produce a single scalar. This is justified because an arithmetic mean of monotonic functions is itself monotonic, so the resulting output of each group is still guaranteed to be monotonic in its inputs.
+We average the outputs of the \texttt{lattice\_units} many ensemble lattices of each group by taking the arithmetic meanto produce a single scalar. This is justified because an arithmetic mean of monotonic functions is itself monotonic, so the resulting output of each group is still guaranteed to be monotonic in its inputs.
 
 So we end up with $3K$ scalars, one per group and resource, after Layer~1. 
 

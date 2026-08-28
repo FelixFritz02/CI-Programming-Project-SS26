@@ -40,7 +40,7 @@ The new capacities are given by the following equation:
 \[
   \hat C_{a+i-1} \;\leftarrow\; \hat C_{a+i-1} - q_i, \qquad i = 1,\dots,\ell.
 \]
-Note that $\hat{C_k} \geq 0$ for all valid actions $a \in \mathcal{A}_x^{\text{valid}}$ and all $k=1,\dots,K$.
+Note that $\hat{C_k} \geq 0$ for all valid actions $a \in \mathcal{A}_s^{\text{valid}}$ and all $k=1,\dots,K$.
 
 Figure~\ref{fig:state-transition} illustrates the effect of the transition function $\mathcal{T}$ on a concrete example with
 $K=5$, request length $\ell=3$, action $a=2$ and applies the update rule.
@@ -102,9 +102,9 @@ $K=5$, request length $\ell=3$, action $a=2$ and applies the update rule.
 Selecting an infeasible action, terminates the episode and yields a large negative reward of $-100$ to discourage the agent from taking invalid actions.
 
 \textbf{Objective.} 
-Given a MDP the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes the expected cumulative reward over the decision horizon. In our case, the objective is to maximize the total revenue over the decision horizon by learning an acceptance-and-scheduling policy that maps states to actions.
+Given an MDP the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes the expected cumulative reward over the decision horizon. In our case, the objective is to maximize the total revenue over the decision horizon by learning an acceptance-and-scheduling policy that maps states to actions.
 \begin{equation*}
-      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{T_d}\gamma^{t} r_t\Bigg]
+      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{T_d}\gamma^{t-1} r_t\Bigg]
   \end{equation*}
 Solving this optimization directly is a hard task because we have to find the optimal policy $\pi^*$ over the whole state space and the policy $\pi$ is itself part of the expectation. Instead, we will use Q-learning to learn the optimal action-value function $Q^*(s,a)$, which allows us to derive the optimal policy $\pi^*$ by acting greedily with respect to it.
 
@@ -164,7 +164,7 @@ $$
 Q(\cdot \vert \theta_{DQN}): \quad s \xrightarrow{\text{DQN}}   \begin{pmatrix} Q(s, a_1) \\ Q(s, a_2) \\ \vdots \\ Q(s, a_N) \end{pmatrix}
 $$
 to approximate the action-value function $Q^*(s,a)$.
-We use standard DQN architecture as a baseline which tries to learn the action-value function $Q(s,a)$ without any structural knowledge about the problem. 
+We use the standard DQN architecture as a baseline which tries to learn the action-value function $Q(s,a)$ without any structural knowledge about the problem.
 \subsubsection{Loss function}
 The parameters $\theta_{DQN}$ of the DQN are updated by minimizing a loss function. We use the standard Bellman update rule:
 \[
@@ -189,19 +189,19 @@ and adapt the Q-function as follows:
 \]
 We will use this action-masked Q-function in the following sections to learn the optimal policy $\pi^*$, but still name it $Q(s,a)$.
 Note that deciding only on valid actions is rather intuitive, since the decision maker should never select an invalid action, and the optimal policy $\pi^*$ will never select an invalid action either.
-\subsubsection{$\epsilon$-Greedy and Adaptions}
+\subsubsection{$\epsilon$-Greedy and Adaptations}
 For balancing exploitation and exploration, we use an $\epsilon$-greedy policy, which selects a random action with probability $\epsilon$ and the action given by the Q-function with probability $1-\epsilon$.
 $\epsilon$ is decayed over time, starting with a high value to encourage exploration and gradually decreasing to a lower value to favor exploitation of the learned policy.
 The evaluation of the agent is done with $\epsilon=0$, meaning that the agent always selects the action with highest (approximated) $Q$-value.
 As mentioned above we select an action $a \in \mathcal{A}_s^{\text{valid}}$ randomly in the exploration phase. Hence, each action will be selected 
-with probability $\frac{1}{|\mathcal{A}_s^{\text{valid}}|} = \frac{1}{K-l+2}$, where $l$ is the length of the current request. 
-Note that the probability of rejecting a request is $\frac{1}{K-l+2}$, which is rather small for small requests. This leads to 
+with probability $\frac{1}{|\mathcal{A}_s^{\text{valid}}|} = \frac{1}{K-\ell+2}$, where $\ell$ is the length of the current request.
+Note that the probability of rejecting a request is $\frac{1}{K-\ell+2}$, which is rather small for small requests. This leads to
 a bias towards accepting requests, which is not optimal in the long run, especially when the time horizon $T_d$ is long and the capacities $C_k$ are limited. 
 We will never have the chance to accept a request, which is deep in the future, if we accept too many requests in the beginning.\\
 To counteract this bias, we adapt the $\epsilon$-greedy policy to select the reject action with a higher probability than the other actions.
 We define a parameter $\alpha \in [0,1]$ which defines the probability of selecting the reject action in the exploration phase. The probability of selecting a valid action $a \in \mathcal{A}_s^{\text{valid}} \setminus \{0\}$ is then given by
 \[
-  P(a) = \frac{1-\alpha}{|\mathcal{A}_s^{\text{valid}}|-1} = \frac{1-\alpha}{K-l+1}.
+  P(a) = \frac{1-\alpha}{|\mathcal{A}_s^{\text{valid}}|-1} = \frac{1-\alpha}{K-\ell+1}.
 \]
 
 \subsection{Zustands- und Aktionsraum}
