@@ -17,9 +17,9 @@ Problem} (\acs{drausp}), where the task is to decide whether to accept or reject
 
 In an upfront decision horizon there arrive $T_d \in \mathbb{N}_{>0}$ many requests succesively. Each request is characterized by a tuple $(r,q)$, where $r$ is the immediate positive reward offered for accepting the request and $q = (q_1, q_2, \ldots, q_{len(q)})$ represents the demanded ressource capacities. 
 
-There are $K \in \mathbb{N}_{>0}$ many resources with different capacities $c_k \in \mathbb{N}_{>0}$ for $k = 1, \ldots, K$. 
+There are $K \in \mathbb{N}_{>0}$ many resources with different capacities $C_k \in \mathbb{N}_{>0}$ for $k = 1, \ldots, K$. 
 
-Each request must be scheduled in a contiguous block of slots across the available resources without exceeding the capacity $C_k$ of any resource $k$. Once a request is accepted and scheduled, it occupies those slots for the remainder and cannot be splitted, relocated, or revoked. 
+Each request must be scheduled directly after acceptance in a contiguous block of slots across the available resources without exceeding the capacity $C_k$ of any resource $k$. Once a request is accepted and scheduled, it occupies those slots for the remainder and cannot be splitted, relocated, or revoked. 
 Depending on the available capacity and the resource requirements of the request, the decision maker has to decide first whether to accept or reject the request and second, if accepted, how to schedule it across the available resources. In the scheduling of a request of length $len(q)$, the decision maker has to choose a starting position $s \in \{1, \ldots, K - len(q) + 1\}$.
 The objective is to choose an acceptance-and-scheduling policy to maximize the total revenue over the decision horizon.
 

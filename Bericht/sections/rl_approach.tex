@@ -2,9 +2,12 @@
 \label{sec:rl-approach}
 
 TODO: Belohnungsfunktion, DQN-Agent (Trainingsschleife, Replay-Buffer, Zielnetzwerk, $\epsilon$-greedy).
+
+As discussed in Section~\ref{sec:introduction}, the \acs{drausp} can be formulated as a finite-horizon \acs{mdp} and solved via exact stochastic dynamic programming. However, this approach becomes computationally intractable as the state space grows with the number of resources$K$ and the number of requests. Therefore, we pursue a reinforcement-learning-based, function-approximation approach to learn an acceptance-and-scheduling policy that maximizes the total revenue over the decision horizon.
+
 \subsection{Modeling DRAUSP as a Markov Decision Process}
 To use reinforcement learning techniques for modeling the \ac{drausp}, first of all we need to define
-a \ac{mdp} that represents the problem. We define a state space,an action space and a transition function: 
+a \ac{mdp} that represents the problem. We define a state space $\mathcal{S}$, an action space $\mathcal{A}$ and a transition function $\mathcal{T}$ that describes how the state changes when an action is taken. In addition, we define a reward function $\mathcal{R}$ that assigns a reward to each state-action pair. The goal of the reinforcement learning agent is to learn a policy $\pi$ that maximizes the expected cumulative reward over the decision horizon.
 
 \textbf{State space.} A state
 \[
@@ -113,9 +116,9 @@ time index $t$ is not part of the state vector at all, but only a separate, down
 index of their recursion, indicating how many requests are still to arrive. In particular, the
 current request $[r,q]$ is \emph{not} contained in the state. Our state $s$ (Equation~\eqref{eq:state}), by contrast, contains $r$ and $q$
 explicitly, while our action is reduced to the lean start slot $a \in \{0,\dots,K\}$.
-Table~\ref{tab:mdp-comparison} summarizes this structural comparison; \emph{how} the two
+Table~\ref{tab:mdp-comparison} summarizes this structural comparison; \textcolor{red}{\emph{how} the two
 formulations are subsequently solved (exact dynamic programming vs.\ function approximation via
-\acs{dqn}) is discussed separately in the section on the DQN agent.
+\acs{dqn}) is discussed separately in the section on the DQN agent.}
 
 \begin{table}[htbp]
   \centering
@@ -123,7 +126,7 @@ formulations are subsequently solved (exact dynamic programming vs.\ function ap
     \toprule
      & \textbf{Paper} & \textbf{Our Approach} \\
     \midrule
-    State    & $s_t = (\hat C_1,\dots,\hat C_K)$, $t$ a separate step index
+    State    & $s_t = (\hat C_1,\dots,\hat C_K)$
              & $s = [t,\hat C_1,\dots,\hat C_K,r,q_1,\dots,q_K]$ \\
     Request  & embedded in the action set $A_s$
              & embedded explicitly in the state \\
