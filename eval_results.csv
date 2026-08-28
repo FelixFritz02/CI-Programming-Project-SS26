@@ -1,0 +1,3 @@
+model,subset,instance,K,pool_size,request_length,T_d,capacity_vector,train_episodes,eval_episodes,train_seconds,eval_seconds,train_reward_last100_mean,eval_reward_mean,eval_reward_std,eval_reward_median,eval_reward_min,eval_reward_max,eval_depth_mean,final_epsilon,error
+standard_dqn,lion18s,SA01,4,50,2,10,10 10 10 10,20000,10000,323.2515833377838,20.648183345794678,475.63,479.7277,90.13883432602934,480.0,148.0,809.0,9.9538,0.1,
+standard_dqn,lion18s,SA02,4,50,2,10,10 10 10 10,20000,10000,315.81378722190857,20.46041965484619,461.09,494.0993,87.95160025780538,495.0,193.0,791.0,9.9969,0.1,

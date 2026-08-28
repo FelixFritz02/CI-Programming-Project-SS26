@@ -86,7 +86,7 @@ class DQNAgent:
         lr: float = 1e-3,
         gamma: float = 0.9,
         epsilon_start: float = 1.0,
-        epsilon_min: float = 0.1,
+        epsilon_min: float = 0,
         epsilon_decay_steps: int = 20_000,
         reject_bias: float = 0.5,
         batch_size: int = 64,

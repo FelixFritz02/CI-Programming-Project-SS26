@@ -9,18 +9,19 @@ class DQNNetwork(nn.Module):
     """
     Einfaches Feed-Forward-Netz zur Q-Wert-Approximation.
 
-    Architektur: input → 256 → 256 → 128 → output
+    Architektur: input → hidden_dims[0] → hidden_dims[1] → ... → output
+    (Default hidden_dims=(32, 16), wie bisher fest verdrahtet.)
     """
 
-    def __init__(self, input_dim: int, output_dim: int):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dims: tuple = (32, 16)):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 32),
-            nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, output_dim),
-        )
+        layers = []
+        prev_dim = input_dim
+        for h in hidden_dims:
+            layers += [nn.Linear(prev_dim, h), nn.ReLU()]
+            prev_dim = h
+        layers.append(nn.Linear(prev_dim, output_dim))
+        self.net = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
