@@ -1,5 +1,6 @@
 \section{Monotonicity}
 \label{sec:monotonicity}
+In this section, we present the monotonicity relations that are inherent to the \acs{drausp} problem and how they can be exploited in a reinforcement learning setting. We first describe the domain structure and the expected monotonicity relations between state components and the $Q$-value. Then, we introduce a monotonicity test to empirically evaluate how well a given $Q$-network respects these relations. Finally, we present the Lattice Network architecture, which enforces monotonicity structurally in the network design.
 \subsection{Domain structure and monotonicity relations}
 \label{subsec:monotonicity}
 
@@ -18,14 +19,31 @@ For the state $s$ introduced in Equation~\eqref{eq:state}, plausible monotone re
 A standard DQN (cf.\ \texttt{standard\_dqn.py}) approximates $Q(s,a)$ with a generic feedforward
 network and has no guarantee of respecting those relationships. 
 
-To make use of this domain knowledge, we exploit to enforce the monotonicity relations \textit{structurally} in the network architecture, rather than hoping a generic network learns them. Remark that this is a stronger approach than simply encouraging monotonicity as a soft penalty term in the loss function. 
+To make use of this domain knowledge, we exploit to enforce the monotonicity relations \textit{structurally} in the network architecture, rather than hoping a generic network learns them. Remark that this is a stronger approach than simply encouraging monotonicity as a soft penalty term in the loss function.
 
--------------Monotomitest erklären!!-----------------
+Before presenting this structural solution in detail, it is worth asking whether it is actually needed: a generic network could in principle also learn the relations postulated in Section~\ref{subsec:monotonicity} implicitly while training. Answering this question first requires a test that can measure howwell an arbitrary $Q$-network respects monotonicity in the first place. We introduce such a monotonicity test below and later apply it to both the standard DQN and the Lattice architectures presented in this chapter, so that their monotonicity compliance can be compared quantitatively.
 
+\subsection{Monotonicity test}
+\label{subsec:monotonicity-test}
 
-In this chapter we \textit{(first examine to what extent the monotonicity relations are respected by a standard DQN and then)} introduce a special network architecture, that enforces them structurally. This leads us to so called Lattice Networks.
+Since the state space of \ac{drausp} is far too large to check the postulated relations exactly for every state, we instead test monotonicity empirically on a sample of states (cf.\ \texttt{monotonicity\_evaluation.py}).
 
+Therefore we first collect states that are actually visited during several interactions under random but valid actions. 
 
+For every visited state $s=(t,C,r,q)$ we then construct, for each state component, a comparison state $s'$ that differs from $s$ only in that one component and is ``improved'' according to the monotonicity direction postulated for it:
+\begin{itemize}
+  \item $C$: $s'$ receives a slightly, but non-uniformly across resources, increased capacity $C' > C$,
+  \item $t$: $s'$ lies one time step earlier ($t' = t-1$),
+  \item $r$: $s'$ has twice the reward ($r' = 2r$),
+  \item $q$: $s'$ has half the resource demand ($q' = q/2$).
+\end{itemize}
+In addition, we build a fifth, mixed pair in which all four components are improved simultaneously ($t-1$, increased $C$, doubled $r$, halved $q$), so that interactions between the axes are covered as well.
+
+For every pair $(s,s')$, both states are propagated through the current Q-network and the resulting $Q$-values are compared action-wise, with invalid actions excluded via the already masked $Q$-values. 
+
+The resulting \emph{monotonicity score} is, per feature, the fraction of (state, action) pairs for which this inequality actually holds: a value of $1.0$ means perfect monotonicity compliance, while values $<1$ indicate violations of the respective relation. This gives us five separate scores (for $t$, $C$, $r$, $q$, and the mixed case) to quantify how well the current $Q$-network respects the monotonicity relations in each dimension.
+
+\textcolor{red}{To clarify: When applied?}
 \subsection{Lattice Layers}
 \label{subsec:lattice}
 
