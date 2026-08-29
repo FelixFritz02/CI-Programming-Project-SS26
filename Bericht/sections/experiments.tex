@@ -1,18 +1,70 @@
 \section{Experiments}
 \label{sec:experiments}
 
-TODO: Instanzen, Trainingsaufbau, Baselines (Standard-DQN vs. Lattice-Netzwerke), Ergebnisse, Generalisierung auf ungesehene Instanzen.
- 
+\subsection{Standard-DQN}
+\label{subsec:exp-standard-dqn}
+
+For each \acs{drausp} benchmark instance, we train the standard DQN baseline from
+Section~\ref{sec:rl-approach} -- a plain feedforward network (32~$\to$~16 hidden units) with no
+structural knowledge of the monotonicity relations from Section~\ref{subsec:monotonicity} -- using
+action masking, the target-network soft update, and the reject-biased $\epsilon$-greedy exploration
+described earlier.
+
+\textbf{Parameters.} Unless noted otherwise we use reject-bias $\alpha=0.75$, $\epsilon$ decaying from 
+$1.0$ to $0.1$ over $20{,}000$ steps, a replay buffer of $50{,}000$ transitions with a $500$-step warm-up, 
+batch size $64$ and one training step every $4$ environment steps. We evaluate the agent's monotonicity
+behavior every $100$ training episodes by sampling $5$ trajectories, creating pairs of states as described 
+in Section~\ref{subsec:monotonicity}, and counting the number of monotonicity violations in these pairs.
+
+One can see one example of the training results in Figure~\ref{fig:standard_dqn} for the first $2000$ epsiodes.
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=\textwidth]{grafiken/Experiments/standard_DQN.png}
-	\caption{Standard-DQN Ergebnisse.}
+	\includegraphics[width=\textwidth]{grafiken/Experiments/standard_DQN_mono.png}
+	\caption{Standard-DQN and its monotonicity ratios for SB05, $T_d = 50$ and the first $2000$ episodes}
 	\label{fig:standard_dqn}
 \end{figure}
 
+\textbf{Monotonicity behavior.} The Standard-DQN without any structural knowledge about the
+problem, still manages to learn a policy that is mostly monotone, with only a few violations. Especially
+the monotonicity in $C_k$ is learned very well, and is fulfilled after few training episodes already.
+Monotonicity in $q$ shows an interesting behavior: first the monotonicity drops to a ratio of $0$,
+however during training the monotonicity recovers and gets to a ratio of $>0.9$ at the end. This behaviour can
+be seen across different instances.
+
+\textbf{Hier nochmal drüberschauen wies am Ende aussieht.}
+
+The monotonicity in $t$ and $r$ is learned well from the beginning on and achieves a ratio $>0.9$ in the end.
+For the mixed pairs the monotonicity is learned very well from the beginning on.
+
+
+\textbf{Evluation.} After training, the agent's performance is evaluated. Note that the network weights does not
+change anymore here. We report the average performance on $10{,}000$ episodes with $\epsilon = 0$.
+The training and evaluation phase is shown iun Figures \ref{fig:standard_dqn_training} and \ref{fig:standard_dqn_eval}
+
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=\textwidth]{grafiken/Experiments/deep_DQN_vectorized.png}
-	\caption{Deep-DQN (vectorized) Ergebnisse.}
-	\label{fig:deep_dqn_vectorized}
+	\includegraphics[width=\textwidth]{grafiken/Experiments/standard_DQN_train_10000_SB5.png}
+	\caption{SB05, $T_d = 50$, $10000$ episodes training}
+	\label{fig:standard_dqn_training}
 \end{figure}
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{grafiken/Experiments/standard_DQN_eval_SB5.png}
+	\caption{SB05, $T_d = 50$, evaluation phase}
+	\label{fig:standard_dqn_eval}
+\end{figure}
+\subsection{Lattice-DQN}
+The Lattice-DQN is built up exactly as described in Section~\ref{subsec:lattice-architecture}.
+
+\textbf{Parameters.} We use $P=8$ keypoints for the calibrators, and ensemble widths $U_1=4, U_2=2$ for the two layers of lattices.
+The parameters for th training scheme are the same as fr the Standard-DQN.
+
+Not surprsingly the monotonicity behavior is perfect from the beginning on, as the network architecture enforces monotonicity by design.
+Nevertheless, the training is slower, even compared with a Standard-DQN with the same number of parameters, as the network is more complex and has to learn the same policy with a more constrained function class.
+
+\subsection{Comparison}
+In \ref{sec:lattice-params} we determined the exact number of parameters for the Lattice-DQN architecture dependent on the number of resources $K$, calibrator keypoints $P$, and ensemble widths $U_1$ and $U_2$.
+We fix the number of keypoints and the ensemble widths, hence the number of parameters is only dependent on the number of resources $K$.
+To obtain a fair comparison, we adapt the layer sizes of the Standard-DQN to have the same number of parameters in both 
+architectures. We compare the training results in the follwing table.
+ 

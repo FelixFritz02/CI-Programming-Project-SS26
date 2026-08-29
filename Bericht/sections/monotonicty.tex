@@ -145,6 +145,7 @@ To retain the benefits of the lattice principle while scaling to larger state sp
 \subsection{Deep Lattice architecture for DRAUSP}
 Instead of one very large lattice, we compose many small 3-input lattices in a layered architecture. This preserves the same structural monotonicity guarantees as a single lattice, but distributes the complexity across several local modules that can be trained jointly. 
 \subsubsection{Model architecture}
+\label{subsec:lattice-architecture}
 
 In our concrete network, this decomposition is implemented as follows:
 
@@ -333,7 +334,7 @@ Figure~\ref{fig:deep-lattice-architecture} sketches this construction for $K=2$ 
 \end{figure}
 
 \subsubsection{Model parameters}
-
+\label{subsec:lattice-params}
 To get an idea of the model complexity we now investigate the number of learnable parameters in the Deep Lattice architecture. The following analysis is valid for any number of resources $K$, any number of calibrator keypoints $P$, any ensemble width $U_1$ in Layer~1, any ensemble width $U_2$ in Layer~2, and any number of actions $D$.
 
 \begin{itemize}

@@ -2,13 +2,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_training_progress(reward_history, monotonicity_history, title="Training Progress"):
+def plot_training_progress(reward_history, monotonicity_history, title="Training Progress", window=50):
     """
     Plottet kumulierten Reward (linke Achse) zusammen mit den Monotonie-Verhältnissen
     aus evaluate_monotonicity_systematic (rechte Achse, 0-1).
 
     monotonicity_history: Liste von (episode, mono_c, mono_t, mono_r, mono_q, mono_mixed)
     -Tupeln, wie von DQNAgent.train() zurückgegeben.
+    window: Fenstergröße für den gleitenden Mittelwert des Rewards (rot markiert).
     """
     episodes   = [x[0] for x in monotonicity_history]
     mono_c     = [x[1] for x in monotonicity_history]
@@ -17,26 +18,37 @@ def plot_training_progress(reward_history, monotonicity_history, title="Training
     mono_q     = [x[4] for x in monotonicity_history]
     mono_mixed = [x[5] for x in monotonicity_history]
 
-    fig, ax1 = plt.subplots()
-    ax1.plot(reward_history, color="blue", label="Cumulated Reward")
-    ax1.set_xlabel("Episode")
-    ax1.set_ylabel("Cumulated Reward", color="blue")
+    r = np.array(reward_history)
+    n = len(r)
+
+    fig, ax1 = plt.subplots(figsize=(13, 5))
+    ax1.plot(r, color="tab:blue", alpha=0.6, label="Cumulated Reward")
+    if n >= window and window > 0:
+        mov = np.convolve(r, np.ones(window) / window, mode="valid")
+        ax1.plot(np.arange(window - 1, n), mov, color="red", label=f"{window}-Episode moving average")
+    ax1.set_xlabel("Episode", fontdict={"fontsize": 12})
+    ax1.set_ylabel("Cumulated Reward", color="tab:blue", fontdict={"fontsize": 12})
 
     ax2 = ax1.twinx()
-    ax2.plot(episodes, mono_r,     color="red",    label="Monotonicity reward r (systematic)")
+    ax2.plot(episodes, mono_r,     color="brown",  label="Monotonicity reward r (systematic)")
     ax2.plot(episodes, mono_c,     color="green",  label="Monotonicity C_k (systematic)")
     ax2.plot(episodes, mono_t,     color="orange", label="Monotonicity t (systematic)")
     ax2.plot(episodes, mono_q,     color="black",  label="Monotonicity q (systematic)")
     ax2.plot(episodes, mono_mixed, color="purple", label="Monotonicity mixed (systematic)")
-    ax2.set_ylabel("Monotonicity Ratio")
-    ax2.set_ylim(0, 1)
+    ax2.set_ylabel("Monotonicity Ratio", fontdict={"fontsize": 12})
+    ax2.set_ylim(0, 1.1)
 
     handles1, labels1 = ax1.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(handles1 + handles2, labels1 + labels2, loc="lower left", fontsize="small")
+    ax1.legend(
+        handles1 + handles2, labels1 + labels2,
+        loc="upper left", bbox_to_anchor=(1.15, 1.0),
+        borderaxespad=0.0, fontsize=12, framealpha=0.9,
+    )
 
     plt.title(title)
     fig.tight_layout()
+    fig.subplots_adjust(right=0.8)
     plt.show()
 
 
@@ -119,7 +131,7 @@ def plot_eval_rewards(eval_rewards, window=50, title="Eval-Reward-History", verb
     return stats
 
 
-def plot_reward_moving_average(reward_history, window=50, title="Reward History", figsize=(9,4), verbose=True):
+def plot_reward_moving_average(reward_history, window=50, title="Reward History", figsize=(13,4.5), verbose=True):
     """Plot kumulierter Reward pro Episode mit gleitendem Mittelwert.
 
     Parameters
@@ -165,8 +177,9 @@ def plot_reward_moving_average(reward_history, window=50, title="Reward History"
     plt.xlabel('Episode')
     plt.ylabel('Cumulated Reward')
     plt.title(title)
-    plt.legend(fontsize='small')
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2, fontsize=12)
     plt.grid(True)
+    plt.tight_layout()
     plt.show()
 
     return stats
