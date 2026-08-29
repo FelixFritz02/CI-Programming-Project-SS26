@@ -19,31 +19,32 @@ For the state $s$ introduced in Equation~\eqref{eq:state}, plausible monotone re
 A standard DQN (cf.\ \texttt{standard\_dqn.py}) approximates $Q(s,a)$ with a generic feedforward
 network and has no guarantee of respecting those relationships. 
 
-To make use of this domain knowledge, we exploit to enforce the monotonicity relations \textit{structurally} in the network architecture, rather than hoping a generic network learns them. Remark that this is a stronger approach than simply encouraging monotonicity as a soft penalty term in the loss function.
+To make use of this domain knowledge, we choose to enforce the monotonicity relations \textit{structurally} in the network architecture, rather than hoping a generic network learns them. Remark that this is a stronger approach than simply encouraging monotonicity as a soft penalty term in the loss function.
 
-Before presenting this structural solution in detail, it is worth asking whether it is actually needed: a generic network could in principle also learn the relations postulated in Section~\ref{subsec:monotonicity} implicitly while training. Answering this question first requires a test that can measure howwell an arbitrary $Q$-network respects monotonicity in the first place. We introduce such a monotonicity test below and later apply it to both the standard DQN and the Lattice architectures presented in this chapter, so that their monotonicity compliance can be compared quantitatively.
+Before presenting this structural solution in detail, it is worth asking whether it is actually needed: a generic network could in principle also learn the relations postulated above implicitly while training. Answering this question, it first requires a test that can measure how well an arbitrary $Q$-network respects monotonicity in the first place. We introduce such a monotonicity test below and later apply it to both the standard DQN and the Lattice architectures presented in this chapter, so that their monotonicity compliance can be compared quantitatively.
 
 \subsection{Monotonicity test}
 \label{subsec:monotonicity-test}
 
-Since the state space of \ac{drausp} is far too large to check the postulated relations exactly for every state, we instead test monotonicity empirically on a sample of states (cf.\ \texttt{monotonicity\_evaluation.py}).
+Since the state space of \ac{drausp} is far too large to check the postulated relations exactly for every state, we will test monotonicity empirically on a sample of states (cf.\ \texttt{monotonicity\_evaluation.py}).
 
-Therefore we first collect states that are actually visited during several interactions under random but valid actions. 
+To do so, we first roll out several trajectories in the environment under a random but valid policy, i.e., an episode is played out end to end by repeatedly sampling a uniformly random action from the valid action set $\mathcal{A}_s^{\text{valid}}$, and collect every state visited along the way.
 
-For every visited state $s=(t,C,r,q)$ we then construct, for each state component, a comparison state $s'$ that differs from $s$ only in that one component and is ``improved'' according to the monotonicity direction postulated for it:
+For every visited state $s=(t,C,r,q)$, we construct one comparison state $s'$ per state component: each $s'$ differs from $s$ in exactly that component and is ``improved'' according to the monotonicity direction postulated for it:
 \begin{itemize}
-  \item $C$: $s'$ receives a slightly, but non-uniformly across resources, increased capacity $C' > C$,
-  \item $t$: $s'$ lies one time step earlier ($t' = t-1$),
-  \item $r$: $s'$ has twice the reward ($r' = 2r$),
-  \item $q$: $s'$ has half the resource demand ($q' = q/2$).
+  \item $C$: $s_C'$ receives a slightly increased capacity $C' > C$, applied non-uniformly across resources,
+  \item $t$: $s_t'$ has an earlier decision epoch ($t' = t-1$),
+  \item $r$: $s_r'$ has twice the reward ($r' = 2r$),
+  \item $q$: $s_q'$ has half of the resource demand ($q' = q/2$).
 \end{itemize}
-In addition, we build a fifth, mixed pair in which all four components are improved simultaneously ($t-1$, increased $C$, doubled $r$, halved $q$), so that interactions between the axes are covered as well.
+In addition, we build a fifth pair $(s,s_{\text{mixed}})$ in which all of the four components are improved simultaneously ($t-1$, increased $C$, doubled $r$, halved $q$), so that interactions between the axes are covered as well.
 
 For every pair $(s,s')$, both states are propagated through the current Q-network and the resulting $Q$-values are compared action-wise, with invalid actions excluded via the already masked $Q$-values. 
 
-The resulting \emph{monotonicity score} is, per feature, the fraction of (state, action) pairs for which this inequality actually holds: a value of $1.0$ means perfect monotonicity compliance, while values $<1$ indicate violations of the respective relation. This gives us five separate scores (for $t$, $C$, $r$, $q$, and the mixed case) to quantify how well the current $Q$-network respects the monotonicity relations in each dimension.
+The resulting \emph{monotonicity score}, calculated per feature, is the fraction of (state, action) pairs for which this inequality actually holds: a value of $1.0$ means perfect monotonicity compliance, while values $<1$ indicate violations of the respective relation. 
+This leads us to five separate scores, namely for $t$, $C$, $r$, $q$, and the mixed case, which helps us to quantify how well the current $Q$-network respects the monotonicity relations in each dimension.
 
-\textcolor{red}{To clarify: When applied?}
+We will run this monotonicity test periodically during training and report the results in Section~\ref{sec:experiments} for both the standard DQN and the Lattice architecture, so that their monotonicity compliance can be compared quantitatively. 
 \subsection{Lattice Layers}
 \label{subsec:lattice}
 
@@ -62,7 +63,7 @@ A single lattice with $d$ inputs has $2^d$ learnable corner weights (assuming a 
 
 
 \textbf{Computing the function value.} The output value $\hat{Q}$ of a lattice for the calibrated inputs
-$(x_1,x_2,x_3) \in [0,1]^3$ is computed as a (trillinear) convex combination of the $2^3=8$ corner weights $\theta_{ijk}$, $i,j,k \in \{0,1\}$, of the cube:
+$(x_1,x_2,x_3) \in [0,1]^3$ is computed as a (trilinear) convex combination of the $2^3=8$ corner weights $\theta_{ijk}$, $i,j,k \in \{0,1\}$, of the cube:
 \begin{equation*}
   \label{eq:trilinear}
   \hat{Q}(x_1, x_2, x_3) = \sum_{i,j,k \in \{0,1\}} 
@@ -76,7 +77,7 @@ To illustrate, consider the two-dimensional case  with the four corner weights $
 \end{equation*}
 \vspace{0.5cm}
 
-Take care of the calibration step which is essential: each raw quantity ($t$, $C_k$, $r$, $q_k$) is transformed by a monotone 	\textit{NumericalCalibrator} into $[0,1]$, so that increasing and decreasing variables can be handled by the same interpolation machinery. 
+The calibration step is essential here: each raw quantity ($t$, $C_k$, $r$, $q_k$) is transformed by a monotone \textit{NumericalCalibrator} into $[0,1]$, so that increasing and decreasing variables can be handled by the same interpolation machinery.
 
 However, as $d$ grows, the number of corner weights grows exponentially ($2^d$), which makes a single lattice over all $2+2K$ state components intractable for \ac{drausp} instances with several resources $K$ (cf.\ \texttt{full\_lattice.py}).
 
@@ -164,7 +165,7 @@ Each group is processed by \texttt{lattice\_units} many independent $2\times2\ti
 (an ensemble), so that Layer~1 can learn several alternative nonlinear, but guaranteed monotonic,
 combinations of these quantities. 
 For each lattice, the $2^3=8$ corner weights of each lattice are learned independently, and the output is a single scalar per lattice unit.
-We average the outputs of the \texttt{lattice\_units} many ensemble lattices of each group by taking the arithmetic meanto produce a single scalar. This is justified because an arithmetic mean of monotonic functions is itself monotonic, so the resulting output of each group is still guaranteed to be monotonic in its inputs.
+We average the outputs of the \texttt{lattice\_units} many ensemble lattices of each group by taking the arithmetic mean to produce a single scalar. This is justified because an arithmetic mean of monotonic functions is itself monotonic, so the resulting output of each group is still guaranteed to be monotonic in its inputs.
 
 So we end up with $3K$ scalars, one per group and resource, after Layer~1. 
 
@@ -183,10 +184,11 @@ lattices in Layer~2 grows linearly with the number of resources $K$. Concretely,
 $i=0,\dots,K-1$ one triplet is formed from resource $k_A=i$ in group $A$, $k_B=(i+1)\bmod K$ in
 group $B$, and $k_C=(i+2)\bmod K$ in group $C$, so sweeping $i$ over all $K$ resources yields
 exactly $K$ triplets instead of enumerating all $K^3$ possible $(k_A,k_B,k_C)$ combinations.
-\textbf{Output layer.} A \texttt{Linear} outputlayer aggregates all Layer-2 outputs into one $Q$-value
+
+\textbf{Output layer.} A \texttt{Linear} output layer aggregates all Layer-2 outputs into one $Q$-value
 per action. Its weights are clamped to $\geq 0$ after every optimization step
 (\texttt{apply\_constraints()}), so that a positive (monotonic) effect from the preceding layers
-cannot be reversed by negative weights in this final step. This makes $Q(s,a)$ monotonic in $t$, $C_k$, $r$, and $q_k$ - enforced by the architecture.
+cannot be reversed by negative weights in this final step. This makes $Q(s,a)$ monotonic in $t$, $C_k$, $r$, and $q_k$ -- enforced by the architecture.
 
 Figure~\ref{fig:deep-lattice-architecture} sketches this construction for $K=2$ resources.
 
@@ -211,32 +213,52 @@ Figure~\ref{fig:deep-lattice-architecture} sketches this construction for $K=2$ 
     ]
 
     % ---------- Layer 0: raw features ----------
-    \node[inp] (t)  at (0.0,0)  {$t$};
-    \node[inp] (c1) at (1.4,0)  {$C_1$};
-    \node[inp] (c2) at (2.8,0)  {$C_2$};
-    \node[inp] (r)  at (4.2,0)  {$r$};
-    \node[inp] (q1) at (5.6,0)  {$q_1$};
-    \node[inp] (q2) at (7.0,0)  {$q_2$};
+    % (row centered under Layer 1's midpoint, x=5.7)
+    \node[inp] (t)  at (2.2,0)  {$t$};
+    \node[inp] (c1) at (3.6,0)  {$C_1$};
+    \node[inp] (c2) at (5.0,0)  {$C_2$};
+    \node[inp] (r)  at (6.4,0)  {$r$};
+    \node[inp] (q1) at (7.8,0)  {$q_1$};
+    \node[inp] (q2) at (9.2,0)  {$q_2$};
 
     % ---------- Layer 0: calibrators ----------
-    \node[cal] (calt)  at (0.0,-1.6) {cal$_t$\\\tiny DEC};
-    \node[cal] (calc1) at (1.4,-1.6) {cal$_{C_1}$\\\tiny INC};
-    \node[cal] (calc2) at (2.8,-1.6) {cal$_{C_2}$\\\tiny INC};
-    \node[cal] (calr)  at (4.2,-1.6) {cal$_r$\\\tiny INC};
-    \node[cal] (calq1) at (5.6,-1.6) {cal$_{q_1}$\\\tiny DEC};
-    \node[cal] (calq2) at (7.0,-1.6) {cal$_{q_2}$\\\tiny DEC};
+    \node[cal] (calt)  at (2.2,-1.9) {cal$_t$\\\tiny DEC};
+    \node[cal] (calc1) at (3.6,-1.9) {cal$_{C_1}$\\\tiny INC};
+    \node[cal] (calc2) at (5.0,-1.9) {cal$_{C_2}$\\\tiny INC};
+    \node[cal] (calr)  at (6.4,-1.9) {cal$_r$\\\tiny INC};
+    \node[cal] (calq1) at (7.8,-1.9) {cal$_{q_1}$\\\tiny DEC};
+    \node[cal] (calq2) at (9.2,-1.9) {cal$_{q_2}$\\\tiny DEC};
 
     \foreach \a/\b in {t/calt, c1/calc1, c2/calc2, r/calr, q1/calq1, q2/calq2}
       \draw[->] (\a) -- (\b);
 
     % ---------- Layer 1: lattice groups per resource k ----------
-    \node[latA] (a1) at (0.7,-3.6) {$A_1$\\\tiny$[t,r,C_1]$};
-    \node[latB] (b1) at (2.1,-3.6) {$B_1$\\\tiny$[C_1,q_1,r]$};
-    \node[latC] (g1) at (3.5,-3.6) {$C_1$\\\tiny$[t,C_1,q_1]$};
+    % Each group is realized by `lattice_units` many parallel lattices (an
+    % ensemble); the two offset, lighter copies behind every box visualize
+    % this multiplicity as a fanned stack.
+    \node[latA, fill=red!8,     draw=black!35] at ($(0.7,-4.3)+(0.16,0.24)$) {};
+    \node[latA, fill=red!11,    draw=black!45] at ($(0.7,-4.3)+(0.08,0.12)$) {};
+    \node[latA] (a1) at (0.7,-4.3) {$A_1$\\\tiny$[t,r,C_1]$};
 
-    \node[latA] (a2) at (4.9,-3.6) {$A_2$\\\tiny$[t,r,C_2]$};
-    \node[latB] (b2) at (6.3,-3.6) {$B_2$\\\tiny$[C_2,q_2,r]$};
-    \node[latC] (g2) at (7.7,-3.6) {$C_2$\\\tiny$[t,C_2,q_2]$};
+    \node[latB, fill=green!10,  draw=black!35] at ($(2.7,-4.3)+(0.16,0.24)$) {};
+    \node[latB, fill=green!14,  draw=black!45] at ($(2.7,-4.3)+(0.08,0.12)$) {};
+    \node[latB] (b1) at (2.7,-4.3) {$B_1$\\\tiny$[C_1,q_1,r]$};
+
+    \node[latC, fill=orange!13, draw=black!35] at ($(4.7,-4.3)+(0.16,0.24)$) {};
+    \node[latC, fill=orange!16, draw=black!45] at ($(4.7,-4.3)+(0.08,0.12)$) {};
+    \node[latC] (g1) at (4.7,-4.3) {$C_1$\\\tiny$[t,C_1,q_1]$};
+
+    \node[latA, fill=red!8,     draw=black!35] at ($(6.7,-4.3)+(0.16,0.24)$) {};
+    \node[latA, fill=red!11,    draw=black!45] at ($(6.7,-4.3)+(0.08,0.12)$) {};
+    \node[latA] (a2) at (6.7,-4.3) {$A_2$\\\tiny$[t,r,C_2]$};
+
+    \node[latB, fill=green!10,  draw=black!35] at ($(8.7,-4.3)+(0.16,0.24)$) {};
+    \node[latB, fill=green!14,  draw=black!45] at ($(8.7,-4.3)+(0.08,0.12)$) {};
+    \node[latB] (b2) at (8.7,-4.3) {$B_2$\\\tiny$[C_2,q_2,r]$};
+
+    \node[latC, fill=orange!13, draw=black!35] at ($(10.7,-4.3)+(0.16,0.24)$) {};
+    \node[latC, fill=orange!16, draw=black!45] at ($(10.7,-4.3)+(0.08,0.12)$) {};
+    \node[latC] (g2) at (10.7,-4.3) {$C_2$\\\tiny$[t,C_2,q_2]$};
 
     \draw[->] (calt) -- (a1); \draw[->] (calr)  -- (a1); \draw[->] (calc1) -- (a1);
     \draw[->] (calc1)-- (b1); \draw[->] (calq1) -- (b1); \draw[->] (calr)  -- (b1);
@@ -246,55 +268,64 @@ Figure~\ref{fig:deep-lattice-architecture} sketches this construction for $K=2$ 
     \draw[->] (calc2)-- (b2); \draw[->] (calq2) -- (b2); \draw[->] (calr)  -- (b2);
     \draw[->] (calt) -- (g2); \draw[->] (calc2) -- (g2); \draw[->] (calq2) -- (g2);
 
-    \node[align=left] at (9.6,-3.6) {\scriptsize each $\times$ \texttt{lattice\_units}\\\scriptsize (ensemble)};
-
     % ---------- ensemble averaging: mean over lattice_units per group/resource ----------
-    \node[avg] (avga1) at (0.7,-4.55) {\tiny avg};
-    \node[avg] (avgb1) at (2.1,-4.55) {\tiny avg};
-    \node[avg] (avgg1) at (3.5,-4.55) {\tiny avg};
-    \node[avg] (avga2) at (4.9,-4.55) {\tiny avg};
-    \node[avg] (avgb2) at (6.3,-4.55) {\tiny avg};
-    \node[avg] (avgg2) at (7.7,-4.55) {\tiny avg};
+    \node[avg] (avga1) at (0.7,-5.5) {\tiny avg};
+    \node[avg] (avgb1) at (2.7,-5.5) {\tiny avg};
+    \node[avg] (avgg1) at (4.7,-5.5) {\tiny avg};
+    \node[avg] (avga2) at (6.7,-5.5) {\tiny avg};
+    \node[avg] (avgb2) at (8.7,-5.5) {\tiny avg};
+    \node[avg] (avgg2) at (10.7,-5.5) {\tiny avg};
 
     \foreach \a/\b in {a1/avga1, b1/avgb1, g1/avgg1, a2/avga2, b2/avgb2, g2/avgg2}
       \draw[->] (\a) -- (\b);
 
-    \node[align=left] at (9.6,-4.55) {\scriptsize mean over\\\scriptsize \texttt{lattice\_units}};
+    \node[align=left] at (12.55,-5.5) {\scriptsize mean over\\\scriptsize \texttt{lattice\_units}};
 
     % ---------- intermediate calibrators ----------
-    \node[cb] (cb) at (3.85,-5.9) {Intermediate calibrators ($3K$ total, each INC)};
+    % (centered under Layer 1's midpoint, x=5.7)
+    \node[cb] (cb) at (5.7,-7.1) {Intermediate calibrators ($3K$ total, each INC)};
     \foreach \n in {avga1,avgb1,avgg1,avga2,avgb2,avgg2}
       \draw[->] (\n) -- (cb);
 
     % ---------- Layer 2: cross-resource lattices ----------
-    \node[l2] (l2a) at (1.6,-7.8) {$L2_1$\\\tiny$(A_1,B_2,C_1)$};
-    \node[l2] (l2b) at (3.85,-7.8) {$L2_2$\\\tiny$(A_2,B_1,C_2)$};
-    \node[l2] (l2c) at (6.1,-7.8) {$\cdots$\\\tiny further triplets};
+    % Each triplet is again evaluated by `lattice_units2` many parallel
+    % lattices; same fanned-stack cue as in Layer 1.
+    \node[l2, fill=violet!10, draw=black!35] at ($(3.1,-9.3)+(0.24,0.36)$) {};
+    \node[l2, fill=violet!13, draw=black!45] at ($(3.1,-9.3)+(0.12,0.18)$) {};
+    \node[l2] (l2a) at (3.1,-9.3) {$L2_1$\\\tiny$(A_1,B_2,C_1)$};
+
+    \node[l2, fill=violet!10, draw=black!35] at ($(5.7,-9.3)+(0.24,0.36)$) {};
+    \node[l2, fill=violet!13, draw=black!45] at ($(5.7,-9.3)+(0.12,0.18)$) {};
+    \node[l2] (l2b) at (5.7,-9.3) {$L2_2$\\\tiny$(A_2,B_1,C_2)$};
+
+    \node[l2, fill=violet!10, draw=black!35] at ($(8.3,-9.3)+(0.24,0.36)$) {};
+    \node[l2, fill=violet!13, draw=black!45] at ($(8.3,-9.3)+(0.12,0.18)$) {};
+    \node[l2] (l2c) at (8.3,-9.3) {$\cdots$\\\tiny further triplets};
 
     \draw[->] (cb) -- (l2a);
     \draw[->] (cb) -- (l2b);
     \draw[->] (cb) -- (l2c);
 
     % ---------- output layer ----------
-    \node[outl] (out) at (3.85,-9.5) {Linear, weights $\geq 0$};
+    \node[outl] (out) at (5.7,-11.3) {Linear, weights $\geq 0$};
     \draw[->] (l2a) -- (out);
     \draw[->] (l2b) -- (out);
     \draw[->] (l2c) -- (out);
 
     % ---------- Q-values ----------
-    \node[qn] (q0) at (2.6,-11.0) {$Q(s,a_0)$};
-    \node[qn] (q1o) at (5.1,-11.0) {$Q(s,a_1)$};
+    \node[qn] (q0) at (4.45,-13.1) {$Q(s,a_0)$};
+    \node[qn] (q1o) at (6.95,-13.1) {$Q(s,a_1)$};
     \draw[->] (out) -- (q0);
     \draw[->] (out) -- (q1o);
 
     % ---------- layer labels ----------
     \node[anchor=east, gray] at (-0.9,0)    {\scriptsize Input};
-    \node[anchor=east, gray] at (-0.9,-1.6) {\scriptsize Layer 0};
-    \node[anchor=east, gray] at (-0.9,-3.6) {\scriptsize Layer 1};
-    \node[anchor=east, gray] at (-0.9,-4.55) {\scriptsize Ensemble avg};
-    \node[anchor=east, gray] at (-0.9,-5.9) {\scriptsize Layer 1$\to$2};
-    \node[anchor=east, gray] at (-0.9,-7.8) {\scriptsize Layer 2};
-    \node[anchor=east, gray] at (-0.9,-9.5) {\scriptsize Output};
+    \node[anchor=east, gray] at (-0.9,-1.9) {\scriptsize Layer 0};
+    \node[anchor=east, gray] at (-0.9,-4.3) {\scriptsize Layer 1};
+    \node[anchor=east, gray] at (-0.9,-5.5) {\scriptsize Ensemble avg};
+    \node[anchor=east, gray] at (-0.9,-7.1) {\scriptsize Layer 1$\to$2};
+    \node[anchor=east, gray] at (-0.9,-9.3) {\scriptsize Layer 2};
+    \node[anchor=east, gray] at (-0.9,-11.3) {\scriptsize Output};
 
   \end{tikzpicture}}
   \caption{Sketch of the \emph{Deep Lattice} network for $K=2$ resources as described above.}
@@ -346,13 +377,12 @@ To get an idea of the model complexity we now investigate the number of learnabl
         parameters.
 \end{itemize}
 
-Summing all five contributions gives a count of
+Summing all five contributions gives a total parameter count of
 
 \begin{equation}
   \label{eq:deep-lattice-params}
   N_{\text{DeepLattice}}(K,P,U,U_2,D) \;=\; (5K+2)\,P \;+\; 24\,K\,U \;+\; 8\,K\,U_2 \;+\; (K\,U_2+1)\,D.
 \end{equation}
-many parameters in total.
 
 For the DRAUSP instance used in our experiments ($K=4$ resources, $P=8$ calibrator keypoints,
 ensemble widths $U_1=4$ and $U_2=2$, and $D=4$ actions), Equation~\eqref{eq:deep-lattice-params}
