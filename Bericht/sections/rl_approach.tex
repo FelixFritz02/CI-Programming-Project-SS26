@@ -1,8 +1,5 @@
 \section{Reinforcement Learning Approach}
 \label{sec:rl-approach}
-
-TODO: Belohnungsfunktion, DQN-Agent (Trainingsschleife, Replay-Buffer, Zielnetzwerk, $\epsilon$-greedy).
-
 As discussed in Section~\ref{sec:introduction}, the \acs{drausp} can be formulated as a finite-horizon \acs{mdp} and solved via exact stochastic dynamic programming. However, this approach becomes computationally intractable as the state space grows with the number of resources $K$ and the number of requests. Therefore, we pursue a reinforcement-learning-based, function-approximation approach to learn an acceptance-and-scheduling policy that maximizes the total revenue over the decision horizon.
 
 \subsection{Modeling DRAUSP as a Markov Decision Process}
