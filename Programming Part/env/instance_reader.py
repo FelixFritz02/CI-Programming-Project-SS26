@@ -21,7 +21,7 @@ class DrauspInstanceData:
 def get_instance_data(data_path: Union[str, Path]):
     with data_path.open("r") as file:
         capacity_vector = np.array(file.readline().split(), dtype=int).tolist()
-        revenues = np.array(file.readline().split(), dtype=np.float32) * 100
+        revenues = np.array(file.readline().split(), dtype=np.float32)
         requests = np.loadtxt(file, dtype=np.int32)
 
     num_slots = len(capacity_vector)
@@ -29,7 +29,7 @@ def get_instance_data(data_path: Union[str, Path]):
     request_length = requests.shape[1]
     instance = []
     for i, request in enumerate(requests):
-        row = [int(revenues[i])] + [int(x) for x in request] + [0] * (num_slots - len(request))
+        row = [revenues[i]] + [int(x) for x in request] + [0] * (num_slots - len(request))
         instance.append(row)
     #print(instance)
     return(DrauspInstanceData(num_slots, pool_size, capacity_vector, instance, request_length))

@@ -5,16 +5,22 @@ import torch
 import pandas as pd
 
 
-def _sample_visited_states(env, num_rollouts: int = 5) -> list:
+def _sample_visited_states(env, num_rollouts: int = 5, num_states: int = None) -> list:
     """
-    Rollt num_rollouts Episoden mit zufälligen gültigen Aktionen durch und
-    sammelt jeden dabei tatsächlich besuchten Zustand (t, C, r, q). Liefert
-    echte, ungleichmäßig abgebaute Kapazitäten statt synthetischer
+    Rollt Episoden mit zufälligen gültigen Aktionen durch und sammelt jeden
+    dabei tatsächlich besuchten Zustand (t, C, r, q). Liefert echte,
+    ungleichmäßig abgebaute Kapazitäten statt synthetischer
     cap_full/cap_min/cap_half-Konstanten.
+
+    num_states : ist ein Wert gesetzt, wird solange gerollt, bis mindestens so
+                 viele Zustände gesammelt sind (danach auf num_states gekürzt) —
+                 num_rollouts wird dann ignoriert. Sonst: genau num_rollouts
+                 Episoden.
     """
     K = env.K
     visited = []
-    for _ in range(num_rollouts):
+    rollout = 0
+    while True:
         obs, _ = env.reset()
         done = False
         while not done:
@@ -23,10 +29,18 @@ def _sample_visited_states(env, num_rollouts: int = 5) -> list:
             action = random.choice(valid_actions)
             obs, _, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
+        rollout += 1
+        if num_states is not None:
+            if len(visited) >= num_states:
+                break
+        elif rollout >= num_rollouts:
+            break
+    if num_states is not None and len(visited) > num_states:
+        visited = visited[:num_states]
     return visited
 
 
-def evaluate_monotonicity_systematic(agent, env, num_rollouts: int = 5) -> tuple:
+def evaluate_monotonicity_systematic(agent, env, num_rollouts: int = 5, num_pairs: int = None) -> tuple:
     """
     Testet Monotonie an echten, per Zufalls-Rollout besuchten Zuständen
     (t, C, r, q) statt an synthetischen cap_full/cap_min/cap_half-Konstanten.
@@ -40,6 +54,10 @@ def evaluate_monotonicity_systematic(agent, env, num_rollouts: int = 5) -> tuple
 
     Geprüft wird aktionsweise: Q(s, a) ≥ Q(s', a) für alle gültigen a.
     Score = Anteil der (Zustand, Aktion)-Paare, die Monotonie erfüllen.
+
+    num_pairs : gewünschte Anzahl Vergleichspaare je Achse (= Anzahl besuchter
+                Zustände). Ist der Wert gesetzt, wird so lange gerollt, bis so
+                viele Zustände gesammelt sind; sonst genau num_rollouts Episoden.
     """
     K     = env.K
     C_max = max(env.C_k)
@@ -50,7 +68,7 @@ def evaluate_monotonicity_systematic(agent, env, num_rollouts: int = 5) -> tuple
     pairs_q = []
     pairs_mixed = []
 
-    for t, C, r, q in _sample_visited_states(env, num_rollouts=num_rollouts):
+    for t, C, r, q in _sample_visited_states(env, num_rollouts=num_rollouts, num_states=num_pairs):
         q_half = [qk / 2 for qk in q]
 
         # Paar 1: Monotonie in C_k (kleine, nicht-uniforme Verringerung pro Slot)
