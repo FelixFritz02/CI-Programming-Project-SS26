@@ -86,7 +86,7 @@ class DQNAgent:
         lr: float = 1e-3,
         gamma: float = 0.9,
         epsilon_start: float = 1.0,
-        epsilon_min: float = 0,
+        epsilon_min: float = 0.05,
         epsilon_decay_steps: int = 20_000,
         reject_bias: float = 0.5,
         batch_size: int = 64,
@@ -98,6 +98,7 @@ class DQNAgent:
         monotonicity_penalty: bool = False,
         mono_lambda: float = 0.1,
         mono_noise_scale: float = 3.0,
+        constraint_every: int = 1,
     ):
         self.env = env
         self.gamma = gamma
@@ -114,6 +115,13 @@ class DQNAgent:
         self.monotonicity_penalty = monotonicity_penalty
         self.mono_lambda = mono_lambda
         self.mono_noise_scale = mono_noise_scale
+        # Monotonie-/Wertebereichs-Projektion (policy_net.apply_constraints) nur
+        # alle `constraint_every` Trainingsschritte statt nach jedem — die
+        # Constraint-Projektion ist bei Lattice-Netzen ein starker Laufzeitfaktor
+        # (iterative Dykstra-Projektion pro Lattice/Calibrator), während die
+        # Gewichte pro Schritt nur minimal driften. Am Ende von train() wird
+        # einmal garantiert voll projiziert. <=1 = wie bisher jeder Schritt.
+        self.constraint_every = max(1, int(constraint_every))
 
         # Dimensionen aus der Umgebung auslesen
         input_dim  = env.observation_space.shape[0]   # 2*K + 2
@@ -173,6 +181,7 @@ class DQNAgent:
 
         # Schrittzähler
         self._step = 0
+        self._train_steps = 0   # Anzahl ausgeführter _train_step()-Aufrufe (für constraint_every)
 
     # ------------------------------------------------------------------
     # Action Masking
@@ -311,10 +320,13 @@ class DQNAgent:
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), self.max_grad_norm)
 
         self.optimizer.step()
-        #neu hier das apply constraint für Lattice Networks
-        if hasattr(self.policy_net, 'apply_constraints'):
-            self.policy_net.apply_constraints()
-        
+
+        # Constraint-Projektion (Lattice-Netze) nur alle constraint_every
+        # Trainingsschritte — siehe __init__. Der finale Voll-Projektionsschritt
+        # passiert am Ende von train().
+        self._train_steps += 1
+        if self._train_steps % self.constraint_every == 0:
+            self._apply_constraints()
 
         # Soft Update des Target-Netzes
         # θ_target = τ * θ_policy + (1 - τ) * θ_target
@@ -326,6 +338,13 @@ class DQNAgent:
             )
 
         return loss.item()
+
+    def _apply_constraints(self):
+        """Projiziert policy_net auf den zulässigen (monotonen, wertebereichs-
+        konformen) Bereich zurück — no-op für Netze ohne apply_constraints()
+        (z.B. Standard-DQN)."""
+        if hasattr(self.policy_net, 'apply_constraints'):
+            self.policy_net.apply_constraints()
 
     # ------------------------------------------------------------------
     # Trainingsschleife
@@ -414,7 +433,11 @@ class DQNAgent:
                 if verbose:
                     print(f"  Systematic monotonicity (Episode {episode + 1}): "
                           f"C_k: {mono_c:.1%}, t: {mono_t:.1%}, r: {mono_r:.1%}, q: {mono_q:.1%}, mixed: {mono_mixed:.1%}")
-                    
+
+        # Abschließende Voll-Projektion, damit das finale Netz garantiert die
+        # Monotonie-/Wertebereichs-Constraints erfüllt (unabhängig davon, wo der
+        # letzte Trainingsschritt relativ zu constraint_every lag).
+        self._apply_constraints()
 
         return reward_history, monotonicity_history, depth_history
 

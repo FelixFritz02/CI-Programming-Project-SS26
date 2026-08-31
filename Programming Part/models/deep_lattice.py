@@ -123,19 +123,34 @@ class DeepLatticeNetwork(nn.Module):
         # und die U Einzel-Outputs danach mit cat() zusammenzufügen.
         # Ergebnis ist numerisch identisch, aber ein Tensor-Op statt U
         # Python-Aufrufe (siehe forward(): lat(inp.unsqueeze(1))).
+        #
+        # output_min/output_max = 0/1: Der Schicht-1-Output geht direkt in die
+        # Zwischen-Calibratoren, deren Keypoints fest auf [0,1] liegen. Ohne
+        # Bound initialisieren die Lattices auf [-2,2] und driften frei; alles
+        # außerhalb [0,1] wird von cal_between hart geclippt -> Nullgradient auf
+        # die betroffenen Eckgewichte und die vorgelagerten Input-Calibratoren,
+        # und Schicht 2 kann verschiedene out-of-range Werte nicht unterscheiden.
+        # Mit dem Bound wird der Output per Konstruktion [0,1] (Konvexkombination
+        # von Eckgewichten in [0,1]) und liegt damit exakt im interpolierenden
+        # Bereich von cal_between. Kein Ausdrucksverlust: cal_between ist ein
+        # lernbarer monotoner Warp und absorbiert jede monotone Umskalierung;
+        # die Q-Größenordnung tragen Schicht 2 und der Output-Layer (unbeschränkt).
         self.lattices_A = nn.ModuleList([
             Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_A,
-                    interpolation=Interpolation.HYPERCUBE, units=lattice_units)
+                    interpolation=Interpolation.HYPERCUBE, units=lattice_units,
+                    output_min=0.0, output_max=1.0)
             for _ in range(K)
         ])
         self.lattices_B = nn.ModuleList([
             Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_B,
-                    interpolation=Interpolation.HYPERCUBE, units=lattice_units)
+                    interpolation=Interpolation.HYPERCUBE, units=lattice_units,
+                    output_min=0.0, output_max=1.0)
             for _ in range(K)
         ])
         self.lattices_C = nn.ModuleList([
             Lattice(lattice_sizes=[2, 2, 2], monotonicities=mono_C,
-                    interpolation=Interpolation.HYPERCUBE, units=lattice_units)
+                    interpolation=Interpolation.HYPERCUBE, units=lattice_units,
+                    output_min=0.0, output_max=1.0)
             for _ in range(K)
         ])
 
@@ -184,6 +199,12 @@ class DeepLatticeNetwork(nn.Module):
         # ------------------------------------------------------------------
         self.l2_triplets = self._build_cross_resource_triplets(K)
         n_l2_lattices = len(self.l2_triplets)
+        # Tripel-Indizes als Tensor (K, 3) für die vektorisierte Schicht 2 in
+        # forward(). persistent=False -> nicht im state_dict, keine Auswirkung
+        # auf gespeicherte Modelle.
+        self.register_buffer(
+            "_l2_idx", torch.tensor(self.l2_triplets, dtype=torch.long), persistent=False
+        )
 
         mono_L2 = [Monotonicity.INCREASING] * 3  # Richtung steckt bereits in cal_between
         self.lattices_L2 = nn.ModuleList([
@@ -340,6 +361,31 @@ class DeepLatticeNetwork(nn.Module):
 
         return torch.einsum("bnk,kn->bn", weights, kernel).float()
 
+    @staticmethod
+    def _hypercube_batch(x: torch.Tensor, kernels: torch.Tensor) -> torch.Tensor:
+        """Vektorisierte HYPERCUBE-Interpolation für N parallele 3-Input-Lattices
+        der Größe [2,2,2] (clip_inputs=True) — numerisch identisch zu N einzelnen
+        `pytorch_lattice.Lattice.forward`-Aufrufen, nur ohne Python-Schleife.
+
+        x       : (B, N, 3)  Inputs je Lattice
+        kernels : (N, 8, U)  gestapelte Eckgewichte (`Lattice.kernel` je Modul)
+        return  : (B, N, U)  interpolierte Werte (float)
+
+        Replikat von `Lattice._compute_hypercube_interpolation`:
+        pro Achse i die zwei Gewichte [1-x_i, x_i] auf [0,1] geclippt, flacher
+        Outer-Product in C-Reihenfolge (corner = c0*4 + c1*2 + c2), dann
+        sum_corner iw * kernel — alles in float64 wie in der Bibliothek.
+        """
+        x = x.double()
+        xi = x.unsqueeze(-1)                                     # (B, N, 3, 1)
+        w = torch.cat([1.0 - xi, xi], dim=-1).clamp(0.0, 1.0)    # (B, N, 3, 2)
+        w0, w1, w2 = w[..., 0, :], w[..., 1, :], w[..., 2, :]    # je (B, N, 2)
+        iw = (w0[..., :, None, None]
+              * w1[..., None, :, None]
+              * w2[..., None, None, :]).reshape(x.shape[0], x.shape[1], 8)
+        out = torch.einsum("bnc,ncu->bnu", iw, kernels.double())
+        return out.float()
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         K = self.K
 
@@ -350,67 +396,54 @@ class DeepLatticeNetwork(nn.Module):
         q = x[:, K+2:2*K+2]
 
         # Kalibrieren (Schicht 1 Input)
-        t_cal = self.cal_t(t.double()).float()
-        r_cal = self.cal_r(r.double()).float()
-        c_cal = self._batched_calibrate(c, self.cal_c)
-        q_cal = self._batched_calibrate(q, self.cal_q)
+        t_cal = self.cal_t(t.double()).float()          # (B, 1)
+        r_cal = self.cal_r(r.double()).float()          # (B, 1)
+        c_cal = self._batched_calibrate(c, self.cal_c)  # (B, K)
+        q_cal = self._batched_calibrate(q, self.cal_q)  # (B, K)
 
         # ------------------------------------------------------------------
-        # Schicht 1: Lattice-Gruppen auswerten
-        # Jede Ressource k benutzt EIN Lattice mit units=lattice_units,
-        # das alle lattice_units Ensemble-Outputs in einem Aufruf liefert
-        # (die drei Inputs sind für alle Units identisch, daher genügt ein
-        # unsqueeze(1) statt eines echten repeats über die units-Dimension).
-        # Die U Ensemble-Outputs werden direkt danach über dim=1 gemittelt
-        # (arithmetisches Mittel monotoner Funktionen bleibt monoton), damit
-        # jede (Gruppe, Ressource)-Kombination zu GENAU EINEM Wert wird, der
-        # von allen U Membern informiert ist -- statt dass Schicht 2 später
-        # nur einen einzelnen, per Rotation ausgewählten Member sieht und
-        # der Rest ungenutzt bleibt.
-        # Reihenfolge der Outputs: alle A-Outputs (k=0..K-1), dann B, dann C
-        # → Flat-Vektor der Länge 3*K für cal_between
+        # Schicht 1 (vektorisiert):
+        # Statt `for k in range(K)` mit je 3 Einzel-Lattice-Aufrufen werden
+        # alle K Ressourcen einer Gruppe in EINEM Op ausgewertet. Die K
+        # Lattice-Kernels der ModuleList werden dafür gestapelt — exakt das
+        # Muster von `_batched_calibrate` für die Calibratoren. Parameter,
+        # Monotonie-Richtungen und `apply_constraints()` bleiben unverändert;
+        # jede (Gruppe, Ressource) hat weiterhin ihr eigenes Lattice mit U
+        # Ensemble-Membern, die danach über dim=-1 gemittelt werden.
+        # Reihenfolge der Outputs: A (k=0..K-1), dann B, dann C  → (B, 3K),
+        # Flat-Index = g*K + k (wie `_build_cross_resource_triplets`).
         # ------------------------------------------------------------------
-        out_A, out_B, out_C = [], [], []
-        for k in range(K):
-            ck = c_cal[:, k:k+1]
-            qk = q_cal[:, k:k+1]
+        tK = t_cal.expand(-1, K)                                 # (B, K)
+        rK = r_cal.expand(-1, K)
 
-            inp_A = torch.cat([t_cal, r_cal, ck], dim=1).unsqueeze(1)
-            inp_B = torch.cat([ck, qk, r_cal],    dim=1).unsqueeze(1)
-            inp_C = torch.cat([t_cal, ck, qk],    dim=1).unsqueeze(1)
+        inp_A = torch.stack([tK, rK, c_cal], dim=-1)             # (B, K, 3)  [t, r, C_k]
+        inp_B = torch.stack([c_cal, q_cal, rK], dim=-1)          # (B, K, 3)  [C_k, q_k, r]
+        inp_C = torch.stack([tK, c_cal, q_cal], dim=-1)          # (B, K, 3)  [t, C_k, q_k]
 
-            # (B, lattice_units) pro Gruppe und k, über die Ensemble-Dimension
-            # gemittelt auf (B, 1)
-            out_A.append(self.lattices_A[k](inp_A).float().mean(dim=1, keepdim=True))
-            out_B.append(self.lattices_B[k](inp_B).float().mean(dim=1, keepdim=True))
-            out_C.append(self.lattices_C[k](inp_C).float().mean(dim=1, keepdim=True))
+        W_A = torch.stack([lat.kernel for lat in self.lattices_A], dim=0)  # (K, 8, U)
+        W_B = torch.stack([lat.kernel for lat in self.lattices_B], dim=0)
+        W_C = torch.stack([lat.kernel for lat in self.lattices_C], dim=0)
 
-        # Flat-Vektor: (B, 3*K)
-        # Reihenfolge: [A_k0, A_k1, ..., B_k0, ..., C_k0, ...]
-        l1_flat = torch.cat(out_A + out_B + out_C, dim=1)
+        out_A = self._hypercube_batch(inp_A, W_A).mean(dim=2)    # (B, K)  Ensemble-Mittel über U
+        out_B = self._hypercube_batch(inp_B, W_B).mean(dim=2)
+        out_C = self._hypercube_batch(inp_C, W_C).mean(dim=2)
+
+        l1_flat = torch.cat([out_A, out_B, out_C], dim=1)        # (B, 3K)
 
         # ------------------------------------------------------------------
-        # Zwischen-Calibratoren: jeder Output bekommt seinen eigenen Calibrator
+        # Zwischen-Calibratoren: jeder der 3K Outputs hat seinen eigenen
         # ------------------------------------------------------------------
-        l1_recal = self._batched_calibrate(l1_flat, self.cal_between)  # (B, 3*K*U)
+        l1_recal = self._batched_calibrate(l1_flat, self.cal_between)  # (B, 3K)
 
         # ------------------------------------------------------------------
-        # Schicht 2: Cross-resource Lattices
-        # Jedes Tripel (idxA, idxB, idxC) greift auf drei kalibrierte L1-Outputs zu
+        # Schicht 2 (vektorisiert): die K Cross-Resource-Tripel gleichzeitig.
+        # `_l2_idx` (K, 3) sind die Flat-Indizes (iA, iB, iC) in l1_recal.
+        # Kein Ensemble-Mittel hier (wie bisher) → (B, K*U2).
         # ------------------------------------------------------------------
-        l2_outputs = []
-        for trip_idx, (iA, iB, iC) in enumerate(self.l2_triplets):
-            inp_L2 = torch.cat([
-                l1_recal[:, iA:iA+1],
-                l1_recal[:, iB:iB+1],
-                l1_recal[:, iC:iC+1],
-            ], dim=1).unsqueeze(1)
-
-            # (B, lattice_units2)
-            l2_outputs.append(self.lattices_L2[trip_idx](inp_L2).float())
-
-        # Alles zusammenfügen → (B, n_triplets * lattice_units2)
-        combined = torch.cat(l2_outputs, dim=1)
+        X_L2 = l1_recal[:, self._l2_idx]                         # (B, K, 3)
+        W_L2 = torch.stack([lat.kernel for lat in self.lattices_L2], dim=0)  # (K, 8, U2)
+        l2 = self._hypercube_batch(X_L2, W_L2)                   # (B, K, U2)
+        combined = l2.reshape(l2.shape[0], -1)                   # (B, K*U2)
 
         # Output → (B, output_dim)
         return self.output_layer(combined)
