@@ -63,6 +63,7 @@ from tqdm import tqdm
 from env.gymnasium_env import DrauspEnv
 from env.instance_reader import get_instance_data
 from training.dqn_agent import DQNAgent
+from training.monotonicity_evaluation import evaluate_monotonicity_systematic
 from models.standard_dqn import DQNNetwork
 from models.combine_lattice_dqn import LatticeDQNNetwork
 from models.combine_lattice_dqn_withaction import LatticeDQNNetworkWithAction
@@ -120,8 +121,12 @@ MODELS_DIR = None               # z.B. "trained_models" um die trainierten Gewic
 
 TRAIN_VERBOSE = False           # True = alle 50 Trainings-Episoden eine Zeile drucken (sehr viel Output)
 EVAL_VERBOSE = False            # True = alle 500 Eval-Episoden eine Zeile drucken
-EVAL_MONOTONICITY_EVERY = 0     # >0 aktiviert periodische Monotonie-Auswertung während des Trainings
-MONOTONICITY_PAIRS = 100
+EVAL_MONOTONICITY_EVERY = 100     # >0 aktiviert periodische Monotonie-Auswertung während des Trainings
+MONOTONICITY_PAIRS = 1000
+# >0: nach Training + Eval EINMAL die Monotonie des finalen Netzes mit so vielen
+# Vergleichspaaren je Achse messen und als mono_*_final in die Ergebnis-CSV
+# schreiben (unabhängig von EVAL_MONOTONICITY_EVERY). 0 = aus.
+FINAL_MONOTONICITY_PAIRS = 10_000
 # =========================================================================
 
 
@@ -369,6 +374,7 @@ def evaluate_instances(
     eval_verbose: bool = False,
     eval_monotonicity_every: int = 0,
     monotonicity_pairs: int = 100,
+    final_monotonicity_pairs: int = 0,
     seed: Optional[int] = None,
     out_csv: Optional[Union[str, Path]] = None,
     resume: bool = False,
@@ -393,6 +399,16 @@ def evaluate_instances(
     geschrieben, damit bei einem Abbruch (Laufzeit, KeyboardInterrupt, Fehler)
     kein bereits berechnetes Ergebnis verloren geht. Mit `resume=True` werden
     beim erneuten Start bereits in `out_csv` vorhandene Instanzen übersprungen.
+
+    Monotonie:
+    `eval_monotonicity_every > 0` misst die Monotonie periodisch WÄHREND des
+    Trainings (billig, wenige Rollouts) und speichert den Verlauf in die
+    histories. `final_monotonicity_pairs > 0` misst die Monotonie zusätzlich
+    EINMAL nach Training + Eval am finalen Netz mit so vielen Vergleichspaaren je
+    Achse (z.B. 10_000) und schreibt sie als `mono_c_final … mono_mixed_final`
+    (+ `mono_source="final_net"`, `mono_final_pairs`) in jede Ergebniszeile. Ohne
+    `final_monotonicity_pairs` fällt die CSV auf den letzten Trainings-Snapshot
+    zurück (`mono_source="train_last"`), sofern `eval_monotonicity_every > 0`.
 
     Modellkomplexität matchen (z.B. standard_dqn gegen deep_lattice benchmarken):
     Ist `model == "standard_dqn"` und `match_params_to` gesetzt (Name eines anderen
@@ -491,6 +507,20 @@ def evaluate_instances(
                 )
                 eval_seconds = time.time() - t1
 
+                # Einmalige Monotonie-Messung des FINALEN Netzes (nach Training + Eval),
+                # mit final_monotonicity_pairs Vergleichspaaren je Achse.
+                mono_final = None
+                mono_final_seconds = None
+                if final_monotonicity_pairs and final_monotonicity_pairs > 0:
+                    t2 = time.time()
+                    mono_final = evaluate_monotonicity_systematic(
+                        agent, env, num_pairs=final_monotonicity_pairs
+                    )
+                    mono_final_seconds = time.time() - t2
+                    mc, mt, mr, mq, mm = mono_final
+                    tqdm.write(f"   final monotonicity ({final_monotonicity_pairs} Paare/Achse): "
+                               f"C_k={mc:.1%}, t={mt:.1%}, r={mr:.1%}, q={mq:.1%}, mixed={mm:.1%}")
+
                 row = _build_result_row(
                     model=model, subset=subset, name=name, data=data, T_d=T_d,
                     num_train_episodes=num_train_episodes, num_eval_episodes=num_eval_episodes,
@@ -498,6 +528,8 @@ def evaluate_instances(
                     reward_hist=reward_hist, mono_hist=mono_hist,
                     eval_rewards=eval_rewards, eval_depths=eval_depths,
                     final_train_epsilon=agent.epsilon, n_params=n_params,
+                    mono_final=mono_final, mono_final_pairs=final_monotonicity_pairs,
+                    mono_final_seconds=mono_final_seconds,
                 )
                 row.update(match_info)
 
@@ -532,6 +564,7 @@ def _build_result_row(
     num_train_episodes, num_eval_episodes,
     train_seconds, eval_seconds,
     reward_hist, mono_hist, eval_rewards, eval_depths, final_train_epsilon, n_params,
+    mono_final=None, mono_final_pairs=0, mono_final_seconds=None,
 ) -> dict:
     eval_r = np.array(eval_rewards, dtype=float)
     eval_d = np.array([d for _, d in eval_depths], dtype=float)
@@ -564,11 +597,24 @@ def _build_result_row(
         "final_train_epsilon": final_train_epsilon,
         "error": None,
     }
-    if mono_hist:
+    # Monotonie-Spalten: bevorzugt die dedizierte Messung des finalen Netzes
+    # (mono_final aus evaluate_monotonicity_systematic mit vielen Paaren), sonst
+    # als Fallback der letzte periodische Trainings-Snapshot (mono_hist[-1]).
+    if mono_final is not None:
+        mono_c, mono_t, mono_r, mono_q, mono_mixed = mono_final
+        row.update({
+            "mono_c_final": mono_c, "mono_t_final": mono_t, "mono_r_final": mono_r,
+            "mono_q_final": mono_q, "mono_mixed_final": mono_mixed,
+            "mono_source": "final_net",
+            "mono_final_pairs": mono_final_pairs,
+            "mono_final_seconds": mono_final_seconds,
+        })
+    elif mono_hist:
         _, mono_c, mono_t, mono_r, mono_q, mono_mixed = mono_hist[-1]
         row.update({
             "mono_c_final": mono_c, "mono_t_final": mono_t, "mono_r_final": mono_r,
             "mono_q_final": mono_q, "mono_mixed_final": mono_mixed,
+            "mono_source": "train_last",
         })
     return row
 
@@ -613,6 +659,9 @@ def _add_agent_arguments(parser: argparse.ArgumentParser):
     g.add_argument("--monotonicity-penalty", action="store_true")
     g.add_argument("--mono-lambda", type=float, default=0.1)
     g.add_argument("--mono-noise-scale", type=float, default=3.0)
+    g.add_argument("--constraint-every", type=int, default=10,
+                    help="Constraint-Projektion (Lattice-Netze) nur alle N Trainingsschritte "
+                         "(1 = nach jedem Schritt); Voll-Projektion am Trainingsende immer")
     g.add_argument("--agent-kwargs-json", type=str, default=None,
                     help="Zusätzliche/überschreibende DQNAgent-kwargs als JSON, z.B. "
                          '\'{"buffer_size": 100000}\'')
@@ -626,7 +675,7 @@ def _agent_kwargs_from_args(args) -> dict:
         buffer_size=args.buffer_size, train_every=args.train_every,
         warmup_steps=args.warmup_steps, tau=args.tau, max_grad_norm=args.max_grad_norm,
         monotonicity_penalty=args.monotonicity_penalty, mono_lambda=args.mono_lambda,
-        mono_noise_scale=args.mono_noise_scale,
+        mono_noise_scale=args.mono_noise_scale, constraint_every=args.constraint_every,
     )
     if args.agent_kwargs_json:
         kwargs.update(json.loads(args.agent_kwargs_json))
@@ -658,6 +707,7 @@ def _run_from_editor_config():
         eval_verbose=EVAL_VERBOSE,
         eval_monotonicity_every=EVAL_MONOTONICITY_EVERY,
         monotonicity_pairs=MONOTONICITY_PAIRS,
+        final_monotonicity_pairs=FINAL_MONOTONICITY_PAIRS,
         seed=SEED,
         out_csv=OUT_CSV,
         resume=RESUME,
@@ -704,6 +754,10 @@ def main():
     p_run.add_argument("--eval-episodes", type=int, default=10_000)
     p_run.add_argument("--eval-monotonicity-every", type=int, default=0)
     p_run.add_argument("--monotonicity-pairs", type=int, default=100)
+    p_run.add_argument("--final-monotonicity-pairs", type=int, default=0,
+                        help="Nach Training + Eval EINMAL die Monotonie des finalen Netzes mit "
+                             "so vielen Vergleichspaaren je Achse messen und als mono_*_final in "
+                             "die CSV schreiben (0 = aus)")
     p_run.add_argument("--seed", type=int, default=None)
     p_run.add_argument("--out", type=str, default=str(DEFAULT_OUT_CSV))
     p_run.add_argument("--resume", action="store_true")
@@ -756,6 +810,7 @@ def main():
             eval_verbose=args.eval_verbose,
             eval_monotonicity_every=args.eval_monotonicity_every,
             monotonicity_pairs=args.monotonicity_pairs,
+            final_monotonicity_pairs=args.final_monotonicity_pairs,
             seed=args.seed,
             out_csv=args.out,
             resume=args.resume,
