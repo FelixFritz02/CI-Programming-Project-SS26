@@ -84,3 +84,21 @@ In summary, this report combines the \acs{mdp} formulation of the \acs{drausp} i
 \textcite{drausp_lion18} with value-based deep \acs{rl} \parencite{watkins1992,mnih2015} to scale
 beyond exact dynamic programming, and further constrains the learned $Q$-function to be
 structurally monotonic using the Deep Lattice Network architecture of \textcite{you2017}.
+
+\subsection{Outline}
+\label{subsec:outline}
+
+The remainder of this report is structured as follows. Section~\ref{sec:rl-approach} 
+formulates the \acs{drausp} as an \acs{mdp} and
+develops the Q-learning-based solution approach, including the standard \acs{dqn} baseline.
+The $Q$-learning's structure is explained and two adaptions are introduced which lead to
+better results regarding performance and speed of convergence.
+Section~\ref{sec:monotonicity} motivates the monotonicity relations inherent to the problem,
+introduces a test to measure how well a $Q$-network respects them, and presents the Lattice-based
+architecture that enforces them structurally. The exact structure of the applied Deep Lattice Network
+is reported and the complexity of the network is specified.
+Section~\ref{sec:experiments} evaluates the standard
+\acs{dqn} and the Lattice-\acs{dqn} on \acs{drausp} benchmark instances and compares their
+performance and monotonicity behavior. Section~\ref{sec:conclusion} summarizes our findings and
+discusses limitations and future work.
+
