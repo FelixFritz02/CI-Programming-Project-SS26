@@ -103,7 +103,7 @@ Selecting an infeasible action, terminates the episode and yields a large negati
 \textbf{Objective.} 
 Given an MDP the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes the expected cumulative reward over the decision horizon. In our case, the objective is to maximize the total revenue over the decision horizon by learning an acceptance-and-scheduling policy that maps states to actions.
 \begin{equation*}
-      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{T_d} r_t\Bigg]
+      \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{T_d} \gamma^{t-1} \cdot \mathcal{R}(s_t, a_t)\Bigg]
   \end{equation*}
 Solving this optimization directly is a hard task because we have to find the optimal policy $\pi^*$ over the whole state space and the policy $\pi$ is itself part of the expectation. Instead, we will use Q-learning to learn the optimal action-value function $Q^*(s,a)$, which allows us to derive the optimal policy $\pi^*$ by acting greedily with respect to it.
 
@@ -148,7 +148,7 @@ knows both the reward and the resource demand it is deciding about.
 \subsection{Learning the optimal policy via Q-learning}
 In Q-learning, we try to learn the optimal action-value function
 \[
-  Q^*(s,a) = \max_\pi \; \mathbb{E}\Big[\, \sum_{t'=t}^{T_d} \cdot \mathcal{R}(s_{t'}, a_{t'}) \;\Big|\; s_t = s,\, a_t = a \,\Big],
+  Q^*(s,a) = \max_\pi \; \mathbb{E}\Big[\, \sum_{t'=t}^{T_d} \gamma^{t'-t} \cdot \mathcal{R}(s_{t'}, a_{t'}) \;\Big|\; s_t = s,\, a_t = a \,\Big],
 \]
 which should express the expected cumulative reward of taking action $a$ in state $s$ and then following the optimal policy $\pi^*$ thereafter.
 Once $Q^*$ is known (or
@@ -166,11 +166,11 @@ We use the standard DQN architecture as a baseline which tries to learn the acti
 \subsubsection{Loss function}
 The parameters $\theta_{DQN}$ of the DQN are updated by minimizing a loss function. To stabilize training, the bootstrapped target is computed with a separate \emph{target network} $\theta_{DQN}^-$, which is not trained directly but slowly tracks $\theta_{DQN}$ via a soft update $\theta_{DQN}^- \leftarrow \tau\,\theta_{DQN} + (1-\tau)\,\theta_{DQN}^-$ after every optimization step. We use the standard Bellman update rule:
 \[
-  Q(s_t, a_t) \leftarrow r_{t+1} + \max_{a'} Q(s_{t+1}, a' \vert \theta_{DQN}^-),
+  Q(s_t, a_t) \leftarrow r_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a' \vert \theta_{DQN}^-),
 \]
 and define the loss function as the mean squared error between the current Q-value and the target Q-value:
 \[
-  L(\theta_{DQN}) = \sum_{(s_t, a_t, r_{t+1}, s_{t+1}) \in \mathcal{D'}} \Big[ \big( Q(s_t, a_t \vert \theta_{DQN}) - (r_{t+1} + \max_{a'} Q(s_{t+1}, a' \vert \theta_{DQN}^-)) \big)^2 \Big],
+  L(\theta_{DQN}) = \sum_{(s_t, a_t, r_{t+1}, s_{t+1}) \in \mathcal{D'}} \Big[ \big( Q(s_t, a_t \vert \theta_{DQN}) - (r_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a' \vert \theta_{DQN}^-)) \big)^2 \Big],
 \]
 where $\mathcal{D'}$ is a random sample from the replay buffer that stores the agent's experiences $(s_t, a_t, r_{t+1}, s_{t+1})$.
 \subsubsection{Action Masking}

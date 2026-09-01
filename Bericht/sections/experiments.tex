@@ -10,8 +10,8 @@ structural knowledge of the monotonicity relations from Section~\ref{subsec:mono
 action masking, the target-network soft update, and the reject-biased $\epsilon$-greedy exploration
 described earlier.
 
-\textbf{Parameters.} Unless noted otherwise we use reject-bias $\alpha=0.75$, $\epsilon$ decaying from 
-$1.0$ to $0.05$ over $50{,}000$ steps, a replay buffer of $50{,}000$ transitions with a $500$-step warm-up, 
+\textbf{Parameters.} Unless noted otherwise we use reject-bias $\alpha=0.75$, $\gamma = 0.99$, $\epsilon$ decaying from 
+$1.0$ to $0.05$ over $T_d \cdot 1{.}000$ steps ($10{.}000$ for $T_d=10$, $20{.}000$ for $T_d=20$ and $50{.}000$ for $T_d=50$), a replay buffer of $50{.}000$ transitions with a $500$-step warm-up, 
 batch size $64$ and one training step every $4$ environment steps. We evaluate the agent's monotonicity
 behavior every $100$ training episodes by sampling $5$ trajectories, creating pairs of states as described 
 in Section~\ref{subsec:monotonicity}, and counting the number of monotonicity violations in these pairs.
@@ -53,8 +53,15 @@ The Lattice-DQN is built up exactly as described in Section~\ref{subsec:lattice-
 The parameters for the training scheme are the same as for the Standard-DQN.
 
 Not surprsingly the monotonicity behavior is perfect from the beginning on, as the network architecture enforces monotonicity by design.
-Nevertheless, the training is slower, even compared with a Standard-DQN with the same number of parameters, as the network is more complex and has to learn the same policy with a more constrained function class.\\
-The effect of suffering from a more constrained function class, also takes into account when 
+Again one example of the training phase can be seen in Figure \ref{fig:lattice_dqn_training} for the benchmark instance SB05 with $T_d=50$.\\
+\begin{figure}[ht]
+	\centering
+	\includegraphics[scale=0.5]{grafiken/Experiments/Deep_Lattice_mono_SB5_all.png}
+	\caption{SB05, $T_d = 50$, $10000$ episodes training}
+	\label{fig:lattice_dqn_training}
+\end{figure}
+Compared to a Standard-DQN with the same number of parameters, the agent has to learn the same policy with a more constrained function class.\\
+The effect of suffering from a more constrained function class, takes into account when 
 designing the training architecture. The Lattice Network needs lots of more finetuning of the hyperparameters. 
 In contrast, the standard DQN is way more robust to small changes regarding the hyperparameters of
 the training scheme (s.a. $\epsilon$-decay-steps, reject bias, number of episodes).
