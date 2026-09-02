@@ -4,7 +4,7 @@
 \subsection{Setting}
 \label{subsec:exp-setting}
 
-For each \acs{drausp} benchmark instance which are also used in the experiments of \textcite{drausp_lion18}, we train both the Standard-DQN baseline from
+For each \acs{drausp} benchmark instance, which are also used in the experiments of \textcite{drausp_lion18}, we train both the Standard-DQN baseline from
 Section~\ref{sec:rl-approach} and the Lattice-DQN from Section~\ref{subsec:lattice-architecture}
 using action masking, the target-network soft update, and the reject-biased $\epsilon$-greedy
 exploration described earlier. To provide a fair comparision between the two networks, we adapt the layer sizes of the Standard-DQN to have the same number of parameters as the Lattice-DQN for each instance. 
@@ -30,7 +30,7 @@ of parameters for the Lattice-DQN architecture dependent on the number of resour
 calibrator keypoints $P$, and ensemble widths $U_1$ and $U_2$. We fix the number of calibrator keypoints $P=8$ and
 the ensemble widths $U_1=4, U_2=2$, hence the number of parameters is only dependent on the number of resources
 $K$. To obtain a fair comparison, we adapt the layer sizes of a two layer Standard-DQN to have the same
-number of parameters as the Lattice-DQN for each instance.
+number of learnable parameters as the Lattice-DQN for each instance. We want to ensure by this that the model complexity is the same for both networks.
 
 
 \subsection{Standard-DQN}
