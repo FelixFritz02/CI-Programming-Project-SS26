@@ -73,9 +73,9 @@ from models.deep_lattice import DeepLatticeNetwork
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INSTANCES_DIR = PROJECT_ROOT / "instances"
 DEFAULT_TD_MAPPING = Path(__file__).resolve().parent / "td_mapping.csv"
-DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results.csv"
+DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results_lattice.csv"
 
-MODEL_CHOICES = ["standard_dqn"]
+MODEL_CHOICES = ["deep_lattice"]
 
 
 # =========================================================================
@@ -87,7 +87,7 @@ MODEL_CHOICES = ["standard_dqn"]
 # "python eval.py run --model ...") greift stattdessen die CLI (siehe unten
 # in main()), diese Werte werden dann ignoriert.
 # =========================================================================
-MODEL = "standard_dqn"          # einer aus MODEL_CHOICES
+MODEL = "deep_lattice"          # einer aus MODEL_CHOICES
 TRAIN_EPISODES = 20_000
 EVAL_EPISODES = 10_000
 
@@ -99,7 +99,7 @@ DEFAULT_T_D = None              # Fallback-T_d für Instanzen ohne Eintrag in td
 AGENT_KWARGS = {
     "monotonicity_penalty": False,
     "reject_bias": 0.75,
-    "gamma": 1,
+    "gamma": 0.99,
     "epsilon_decay_steps": 5000,
 }            
 MODEL_KWARGS = {}               # Modell-kwargs, z.B. {"keypoints": 10} (nur für Lattice-Modelle relevant)
@@ -108,12 +108,12 @@ MODEL_KWARGS = {}               # Modell-kwargs, z.B. {"keypoints": 10} (nur fü
 # Nur wirksam wenn MODEL == "standard_dqn". Wird pro Instanz automatisch die
 # Parameterzahl von MATCH_PARAMS_TO berechnet und dazu passende hidden_dims gesucht
 # (überschreibt ein evtl. in MODEL_KWARGS gesetztes "hidden_dims"). None = aus.
-MATCH_PARAMS_TO = "deep_lattice"          # z.B. "deep_lattice"
+MATCH_PARAMS_TO = None          # z.B. "deep_lattice"
 MATCH_PARAMS_TO_KWARGS = {}     # kwargs für das Zielmodell, z.B. {"keypoints": 8, "lattice_units": 4}
 MATCH_DEPTH = 2                 # Anzahl Hidden-Layer für die standard_dqn-Suche
 MATCH_REQUIRE_FUNNEL = True     # h1 >= h2 >= ... erzwingen (wie bisherige (32,16)-Architektur)
 
-OUT_CSV = str(DEFAULT_OUT_CSV)  # liegt fest unter Programming Part/eval_results.csv
+OUT_CSV = str(DEFAULT_OUT_CSV)  # liegt fest unter Programming Part/eval_results_lattice.csv
 RESUME = False                  # True = an vorhandener OUT_CSV fortsetzen, fertige Instanzen überspringen
 SEED = None
 HISTORIES_DIR = None            # z.B. "histories" um reward/depth/mono-Verläufe je Instanz zu speichern
@@ -223,6 +223,13 @@ def _coerce_ranges(kwargs: dict) -> dict:
         k: (tuple(v) if k.endswith("_range") and isinstance(v, list) else v)
         for k, v in kwargs.items()
     }
+
+
+def _instance_agent_kwargs(agent_kwargs: dict, T_d: int) -> dict:
+    """Setzt die Epsilon-Decay-Länge pro Instanz auf T_d * 1000."""
+    kwargs = dict(agent_kwargs)
+    kwargs["epsilon_decay_steps"] = max(1, int(T_d * 1000))
+    return kwargs
 
 
 def build_qnetwork_class(model: str, K: int, T_d: int, C_k: list, **model_kwargs):
@@ -489,7 +496,8 @@ def evaluate_instances(
                 QnetworkClass = build_qnetwork_class(
                     model, K=data.num_slots, T_d=T_d, C_k=data.capacity_vector, **instance_model_kwargs
                 )
-                agent = DQNAgent(env, QnetworkClass=QnetworkClass, **agent_kwargs)
+                instance_agent_kwargs = _instance_agent_kwargs(agent_kwargs, T_d)
+                agent = DQNAgent(env, QnetworkClass=QnetworkClass, **instance_agent_kwargs)
                 n_params = sum(p.numel() for p in agent.policy_net.parameters())
 
                 t0 = time.time()
