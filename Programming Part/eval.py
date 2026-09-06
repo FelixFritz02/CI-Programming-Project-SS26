@@ -73,9 +73,9 @@ from models.deep_lattice import DeepLatticeNetwork
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INSTANCES_DIR = PROJECT_ROOT / "instances"
 DEFAULT_TD_MAPPING = Path(__file__).resolve().parent / "td_mapping.csv"
-DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results_lattice.csv"
+DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results_standard_dqn.csv"
 
-MODEL_CHOICES = ["deep_lattice"]
+MODEL_CHOICES = ["standard_dqn"]
 
 
 # =========================================================================
@@ -87,7 +87,7 @@ MODEL_CHOICES = ["deep_lattice"]
 # "python eval.py run --model ...") greift stattdessen die CLI (siehe unten
 # in main()), diese Werte werden dann ignoriert.
 # =========================================================================
-MODEL = "deep_lattice"          # einer aus MODEL_CHOICES
+MODEL = "standard_dqn"          # einer aus MODEL_CHOICES
 TRAIN_EPISODES = 20_000
 EVAL_EPISODES = 10_000
 
@@ -108,7 +108,7 @@ MODEL_KWARGS = {}               # Modell-kwargs, z.B. {"keypoints": 10} (nur fü
 # Nur wirksam wenn MODEL == "standard_dqn". Wird pro Instanz automatisch die
 # Parameterzahl von MATCH_PARAMS_TO berechnet und dazu passende hidden_dims gesucht
 # (überschreibt ein evtl. in MODEL_KWARGS gesetztes "hidden_dims"). None = aus.
-MATCH_PARAMS_TO = None          # z.B. "deep_lattice"
+MATCH_PARAMS_TO = "deep_lattice"          # z.B. "deep_lattice"
 MATCH_PARAMS_TO_KWARGS = {}     # kwargs für das Zielmodell, z.B. {"keypoints": 8, "lattice_units": 4}
 MATCH_DEPTH = 2                 # Anzahl Hidden-Layer für die standard_dqn-Suche
 MATCH_REQUIRE_FUNNEL = True     # h1 >= h2 >= ... erzwingen (wie bisherige (32,16)-Architektur)
