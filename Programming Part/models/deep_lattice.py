@@ -55,7 +55,7 @@ class DeepLatticeNetwork(nn.Module):
         output_dim:     int,
         c_range:        tuple = (0.0,  20.0),
         t_range:        tuple = (1.0,  20.0),
-        r_range:        tuple = (0.0, 100.0),
+        r_range:        tuple = (0.0, 1.0),
         q_range:        tuple = (0.0,  20.0),
         keypoints:      int   = 8,
         lattice_units:  int   = 4,

@@ -240,6 +240,9 @@ def build_qnetwork_class(model: str, K: int, T_d: int, C_k: list, **model_kwargs
     auf konkrete Wertebereiche (t, C_k, r, q_k), die hier automatisch aus der
     Instanz abgeleitet werden (wie in den Notebooks), sofern nicht explizit
     über model_kwargs überschrieben.
+
+    r liegt seit Commit 7ed660e (Erlöse in instance_reader.py nicht mehr mit
+    100 skaliert) fest in [0, 1], daher r_range=(0, 1).
     """
     model_kwargs = _coerce_ranges(dict(model_kwargs))
     max_cap = float(max(C_k))
@@ -262,7 +265,7 @@ def build_qnetwork_class(model: str, K: int, T_d: int, C_k: list, **model_kwargs
     if model == "full_lattice":
         c_range = model_kwargs.pop("c_range", (0.0, max_cap))
         t_range = model_kwargs.pop("t_range", (1.0, float(T_d)))
-        r_range = model_kwargs.pop("r_range", (0.0, 100.0))
+        r_range = model_kwargs.pop("r_range", (0.0, 1.0))
         q_range = model_kwargs.pop("q_range", (0.0, max_cap))
         return lambda input_dim, output_dim: FullLatticeNetwork(
             input_dim, output_dim, c_range=c_range, t_range=t_range,
@@ -272,7 +275,7 @@ def build_qnetwork_class(model: str, K: int, T_d: int, C_k: list, **model_kwargs
     if model == "deep_lattice":
         c_range = model_kwargs.pop("c_range", (0.0, max_cap))
         t_range = model_kwargs.pop("t_range", (1.0, float(T_d)))
-        r_range = model_kwargs.pop("r_range", (0.0, 100.0))
+        r_range = model_kwargs.pop("r_range", (0.0, 1.0))
         q_range = model_kwargs.pop("q_range", (0.0, max_cap))
         return lambda input_dim, output_dim: DeepLatticeNetwork(
             input_dim, output_dim, c_range=c_range, t_range=t_range,
