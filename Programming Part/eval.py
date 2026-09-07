@@ -658,9 +658,9 @@ def _add_agent_arguments(parser: argparse.ArgumentParser):
     g.add_argument("--lr", type=float, default=1e-3)
     g.add_argument("--gamma", type=float, default=0.9)
     g.add_argument("--epsilon-start", type=float, default=1.0)
-    g.add_argument("--epsilon-min", type=float, default=0.1)
+    g.add_argument("--epsilon-min", type=float, default=0.05)
     g.add_argument("--epsilon-decay-steps", type=int, default=20_000)
-    g.add_argument("--reject-bias", type=float, default=0.5)
+    g.add_argument("--reject-bias", type=float, default=0.75)
     g.add_argument("--batch-size", type=int, default=64)
     g.add_argument("--buffer-size", type=int, default=50_000)
     g.add_argument("--train-every", type=int, default=4)
@@ -670,7 +670,7 @@ def _add_agent_arguments(parser: argparse.ArgumentParser):
     g.add_argument("--monotonicity-penalty", action="store_true")
     g.add_argument("--mono-lambda", type=float, default=0.1)
     g.add_argument("--mono-noise-scale", type=float, default=3.0)
-    g.add_argument("--constraint-every", type=int, default=10,
+    g.add_argument("--constraint-every", type=int, default=1,
                     help="Constraint-Projektion (Lattice-Netze) nur alle N Trainingsschritte "
                          "(1 = nach jedem Schritt); Voll-Projektion am Trainingsende immer")
     g.add_argument("--agent-kwargs-json", type=str, default=None,
