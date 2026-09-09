@@ -1,4 +1,25 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-TODO: Zusammenfassung, Limitationen, Ausblick.
+We developed a represenation of the \acs{drausp} as a finite-horizon \acs{mdp}, which enables us
+to use reinforcement learning techniques to learn acceptance and scheduling policies. For optimization, we used
+a value-based deep \acs{rl} approach, specifically Q-learning with a deep neural network as function approximator.
+We constructed a stable baseline approach in Section \ref{sec:rl-approach} using a Standard \acs{dqn}. We
+tested the behaviour of the learned $Q$-function with respect to monotonicity relations inherent to the problem.
+Doing so, we constructed a monotonicity test to evaluate the learned $Q$-function (see \ref{subsec:monotonicity-test}).\\
+As a second approach, we took advantage of the known monotonicity relations presented in \ref{subsec:monotonicity} 
+and constructed a monotonicity-aware \acs{dqn}, using lattice layers. We built up a deep lattice
+network architecture that enforces monotonicity by design, and again evaluated its performance 
+and monotonicity behaviour on the same benchmark instances as the Standard \acs{dqn}.\\
+We saw that even without any knowledge about the problem strucure at the beginning, the 
+Standard \acs{dqn} still manages to learn monotonicity. The Lattice-\acs{dqn} 
+on the other hand, enforces monotonicity by design and therefore satisfies all monotonicity tests exactly. 
+But using the Lattice-\acs{dqn} comes with a trade-off: the more constrained function class of the Lattice-\acs{dqn}
+makes it harder to learn the optimal policy. This leads to a slower convergence and a slightly worse performance in the end.\\
+
+Future work could focus on improving the performance of the Lattice-\acs{dqn} by using a more complex architecture, e.g. by 
+adding more layers or increasing the number of lattices per layer. Another approach could be to use a hybrid architecture, 
+where the first layers are standard feedforward layers and the last layers are lattice layers. This would allow the network 
+to learn a more complex function while still enforcing monotonicity in the last layers. 
+In our numerical experiments the Standard \acs{dqn} still manages to learn monotonicity, but it is not guaranteed to do so.
+One could test if this holds true if the network architecture is changed or instances get larger and more complex.

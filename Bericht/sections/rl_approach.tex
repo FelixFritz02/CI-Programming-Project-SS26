@@ -82,7 +82,7 @@ $K=5$, request length $\ell=3$, action $a=2$ and applies the update rule.
     \draw[->] (b4) -- node[right, xshift=1pt] {$-q_3$} (a4);
     \draw[->, dashed, gray] (b5) -- (a5);
   \end{tikzpicture}
-  \caption{Effect of the transition function $\mathcal{T}$ ($K=5$ slots, request length $\ell=3$, action $a=2$): the
+  \caption[Effect of the transition function on the resource capacities]{Effect of the transition function $\mathcal{T}$ ($K=5$ slots, request length $\ell=3$, action $a=2$): the
     remaining capacities of the three occupied slots each decrease by the corresponding entry of
     the demand vector $q$, while the capacities of slots outside the accepted block ($k=1,5$)
     are unaffected.}
@@ -133,7 +133,7 @@ formulations are subsequently solved (exact dynamic programming vs.\ function ap
              & $a \in \{0,\dots,K\}$: only the start slot \\
     \bottomrule
   \end{tabular}
-  \caption{Comparison of the state/action space formulation in the DRAUSP formulation of \textcite{drausp_lion18} and in our approach.}
+  \caption[State/action space: \textcite{drausp_lion18} vs.\ our approach]{Comparison of the state/action space formulation in the DRAUSP formulation of \textcite{drausp_lion18} and in our approach.}
   \label{tab:mdp-comparison}
 \end{table}
 

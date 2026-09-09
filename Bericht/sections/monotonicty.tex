@@ -14,14 +14,21 @@ For the state $s$ introduced in Equation~\eqref{eq:state}, plausible monotone re
         be valued worse than one with lower reward.
   \item $q_k$ \textbf{(DECREASING)}: A higher resource demand of the current request restricts the
         remaining capacity more strongly and can only decrease the future reward, when accepted.
-  \end{itemize}
+\end{itemize}
+In detail, for a given state $s = (t, C_1, \dots, C_k, r, q_1, \dots, q_k)$ and every valid action $a \in \mathcal{A}_s^{\text{valid}}$, we expect the following monotonicity relations to hold for the $Q$-function:
+\begin{align*}
+  Q(s, a) &\leq Q(s_{t}', a) \quad \text{(earlier decision epoch is better)} \\
+  Q(s, a) &\leq Q(s_{C}', a) \quad \text{(more capacity is better)} \\
+  Q(s, a) &\leq Q(s_{r}', a) \quad \text{(higher reward is better)} \\
+  Q(s, a) &\leq Q(s_{q}', a) \quad \text{(lower resource demand is better)}
+\end{align*}
+where $s_{t}'$, $s_{C}'$, $s_{r}'$, and $s_{q}'$ are the corresponding improved states according to the monotonicity direction.
 
 A standard DQN (cf.\ \texttt{standard\_dqn.py}) approximates $Q(s,a)$ with a generic feedforward
-network and has no guarantee of respecting those relationships. 
-
+network and has no guarantee of respecting those relationships.
 To make use of this domain knowledge, we choose to enforce the monotonicity relations \textit{structurally} in the network architecture, rather than hoping a generic network learns them. Remark that this is a stronger approach than simply encouraging monotonicity as a soft penalty term in the loss function.
-
-Before presenting this structural solution in detail, it is worth asking whether it is actually needed: a generic network could in principle also learn the relations postulated above implicitly while training. Answering this question, it first requires a test that can measure how well an arbitrary $Q$-network respects monotonicity in the first place. We introduce such a monotonicity test below and later apply it to both the standard DQN and the Lattice architectures presented in this chapter, so that their monotonicity compliance can be compared quantitatively.
+Before presenting this structural solution in detail, it is worth asking whether it is actually needed: a generic network could in principle also learn the relations postulated above implicitly while training. Answering this question, it first requires a test that can measure how well an arbitrary 
+$Q$-network respects monotonicity in the first place. We introduce such a monotonicity test below and later apply it to both the standard DQN and the Lattice architectures presented in this chapter, so that their monotonicity compliance can be compared quantitatively.
 
 \subsection{Monotonicity test}
 \label{subsec:monotonicity-test}
@@ -41,7 +48,7 @@ In addition, we build a fifth pair $(s,s_{\text{mixed}})$ in which all of the fo
 
 For every pair $(s,s')$, both states are propagated through the current Q-network and the resulting $Q$-values are compared action-wise, with invalid actions excluded via the already masked $Q$-values. 
 
-The resulting \emph{monotonicity score}, calculated per feature, is the fraction of (state, action) pairs for which this inequality actually holds: a value of $1.0$ means perfect monotonicity compliance, while values $<1$ indicate violations of the respective relation. 
+The resulting \emph{monotonicity score}, calculated per feature, is the fraction of (state, action) pairs for which this inequality actually holds: a value of $1.0$ means perfect monotonicity compliance, while values less than $1$ indicate violations of the respective relation. 
 This leads us to five separate scores, namely for $t$, $C$, $r$, $q$, and the mixed case, which helps us to quantify how well the current $Q$-network respects the monotonicity relations in each dimension.
 
 We will run this monotonicity test periodically during training and report the results in Section~\ref{sec:experiments} for both the standard DQN and the Lattice architecture, so that their monotonicity compliance can be compared quantitatively. 
@@ -135,7 +142,7 @@ To retain the benefits of the lattice principle while scaling to larger state sp
   {\scriptsize $x_1$: e.\,g.\ $t_{\text{cal}} \in [0,1]$ \quad
    $x_2$: e.\,g.\ $r_{\text{cal}} \in [0,1]$ \quad
    $x_3$: e.\,g.\ $C_{k,\text{cal}} \in [0,1]$}
-  \caption{A single 3-input lattice (grid size $2\times2\times2$) from Layer~1. The eight corner
+  \caption[A single 3-input lattice with trilinear interpolation]{A single 3-input lattice (grid size $2\times2\times2$) from Layer~1. The eight corner
     weights $\theta_{ijk}$ are learnable parameters; the function value at an arbitrary point
     inside the cube $[0,1]^3$ is obtained by trilinear interpolation between the corners.}
   \label{fig:lattice-cube}
@@ -194,9 +201,10 @@ cannot be reversed by negative weights in this final step. This makes $Q(s,a)$ m
 Figure~\ref{fig:deep-lattice-architecture} sketches this construction for $K=2$ resources.
 
 
-\begin{figure}[htbp]
+\begin{figure}[p]
   \centering
-  \resizebox{\textwidth}{!}{%
+  \makebox[\textwidth][c]{%
+  \resizebox{1.18\textwidth}{!}{%
   \begin{tikzpicture}[
       font=\small,
       every node/.style={align=center},
@@ -328,8 +336,8 @@ Figure~\ref{fig:deep-lattice-architecture} sketches this construction for $K=2$ 
     \node[anchor=east, gray] at (-0.9,-9.3) {\scriptsize Layer 2};
     \node[anchor=east, gray] at (-0.9,-11.3) {\scriptsize Output};
 
-  \end{tikzpicture}}
-  \caption{Sketch of the \emph{Deep Lattice} network for $K=2$ resources as described above.}
+  \end{tikzpicture}}}
+  \caption[Deep Lattice network architecture for $K=2$ resources]{Sketch of the \emph{Deep Lattice} network for $K=2$ resources as described above.}
   \label{fig:deep-lattice-architecture}
 \end{figure}
 

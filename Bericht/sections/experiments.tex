@@ -20,7 +20,7 @@ episodes by sampling $5$ trajectories, creating pairs of states as described in
 Section~\ref{subsec:monotonicity-test}, and counting the number of monotonicity violations in
 these pairs. This test is applied identically to both networks.
 
-\textbf{Evaluation.} After performing $20{,}000$ training episodes, the agent's performance is evaluated; note that the network
+\textbf{Evaluation.} After performing $10{,}000$ training episodes, the agent's performance is evaluated; note that the network
 weights do not change anymore here. We report the average performance on $10{,}000$ episodes with
 $\epsilon = 0$. Monotonicity is evaluated by running the monotonicity tests for the different
 parameters, each with $10{,}000$ pairs.
@@ -40,30 +40,29 @@ The Standard-DQN baseline is a standard two-layer feedforward network with no st
 of the monotonicity relations from Section~\ref{subsec:monotonicity}.
 
 \textbf{Monotonicity behavior.} The standard DQN still manages to learn a policy that is mostly monotone, with only a few violations. Especially
-the monotonicity in $C_k$ is learned very well, and is fulfilled after few training episodes already.
-Monotonicity in $q$ shows an interesting behavior: first the monotonicity drops to a ratio of $0$,
-however during training the monotonicity recovers and gets to a ratio of $>0.9$ at the end. This behaviour can
-be seen across different instances.
+the monotonicity in $C_k$ and the monotonicity in the mixed pairs is learned very well, and is fulfilled after few training episodes already.
+Monotonicity in $t$ shows an interesting behavior: first the monotonicity drops to a ratio of $0.2$,
+however during training the monotonicity recovers and gets to a perfect ratio of $1.0$ at the end. This behaviour can
+be seen across different instances. 
+The monotonicity in $q$ and $r$ is learned well from the beginning on and achieves a ratio $>0.8$ in the end. \\
+An illustrative example of the training phase together with the monotonicity behavior is shown in Figure~\ref{fig:standard_dqn_training} for the benchmark instance SB05 with $T_d=50$.
 
-\textbf{Hier nochmal drüberschauen wies am Ende aussieht.}
-
-The monotonicity in $t$ and $r$ is learned well from the beginning on and achieves a ratio $>0.9$ in the end.
-For the mixed pairs the monotonicity is learned very well from the beginning on.
-
-\textbf{Performance.} The training and evaluation phase, together with its monotonicity behaviour,
-is shown in Figures~\ref{fig:standard_dqn_training} and~\ref{fig:standard_dqn_eval} for the
-benchmark instance SB05 with $T_d=50$.
-% TODO: Ergebnisse (Reward-Niveau, Vergleich über Instanzen) beschreiben.
+\textbf{Performance.} After $4000$ episodes of training the agent's performance is already 
+very good and a stable reward niveau is achieved. From this point on, the reward only increases slow and 
+the $50$-episodes moving average fluctuates around the final reward.
+The final evaluation phase shows that the agent achieves a very good performance, which is close to the optimal expected objective value $Z^*$ of the SDP formulation of \textcite{drausp_lion18}.
+Remark that the result in the final evaluation is higher than in the training phase, which is due to the fact that the evaluation is performed with $\epsilon=0$ and therefore no random actions are taken.
 \begin{figure}[ht]
 	\centering
+	\hspace*{-1.8cm}
 	\includegraphics[scale=0.5]{grafiken/Experiments/standard_DQN_mono_SB5_all.png}
-	\caption{SB05, $T_d = 50$, $10000$ episodes training}
+	\caption[Standard-DQN training and monotonicity behavior (SB05, $T_d=50$)]{Standard-DQN: training performance and monotonicity behavior on SB05, $T_d = 50$, over $10\,000$ training episodes.}
 	\label{fig:standard_dqn_training}
 \end{figure}
 \begin{figure}[ht]
 	\centering
 	\includegraphics[scale=0.5]{grafiken/Experiments/standard_DQN_eval_SB5.png}
-	\caption{SB05, $T_d = 50$, evaluation phase}
+	\caption[Standard-DQN evaluation phase (SB05, $T_d=50$)]{Standard-DQN: evaluation phase on SB05, $T_d = 50$.}
 	\label{fig:standard_dqn_eval}
 \end{figure}
 
@@ -76,31 +75,34 @@ The Lattice-DQN is built up exactly as described in Section~\ref{subsec:lattice-
 beginning on, as the network architecture enforces monotonicity by design. An example of the
 training phase is shown in Figure~\ref{fig:lattice_dqn_training} for the benchmark instance SB05
 with $T_d=50$.
-\begin{figure}[ht]
-	\centering
-	\includegraphics[scale=0.5]{grafiken/Experiments/Deep_Lattice_mono_SB5_all.png}
-	\caption{SB05, $T_d = 50$, $10000$ episodes training}
-	\label{fig:lattice_dqn_training}
-\end{figure}
 
 \textbf{Performance.} Compared to a Standard-DQN with the same number of parameters, the agent has
 to learn the same policy with a more constrained function class. This has to be taken into account
 when designing the training architecture: the Lattice network needs considerably more fine-tuning
 of the hyperparameters, whereas the Standard-DQN is much more robust to small changes in the
 training-scheme hyperparameters (e.g.\ $\epsilon$-decay steps, reject bias, number of episodes).
+Nevertheless, using the described training architecture in \ref{subsec:exp-setting}, the results are comparable
+to the ones obtained by the standard \ac{dqn}. 
 
+\begin{figure}[ht]
+	\centering
+	\hspace*{-1.8cm}
+	\includegraphics[scale=0.5]{grafiken/Experiments/Deep_Lattice_mono_SB5_all.png}
+	\caption[Lattice-DQN training and monotonicity behavior (SB05, $T_d=50$)]{Lattice-DQN: training performance and monotonicity behavior on SB05, $T_d = 50$, over $10\,000$ training episodes.}
+	\label{fig:lattice_dqn_training}
+\end{figure}
 
 \subsection{Numerical results}
 \label{subsec:exp-results}
 
 Tables~\ref{tab:results-s} and~\ref{tab:results-w} compare both agents against the optimal
-expected objective value $Z^*$ of the SDP formulation of \textcite{drausp_lion18} (their Table~2
-and Table~1, respectively). $\bar R_{\text{eval}}$ is the mean cumulated reward over $10\,000$
+expected objective value $Z^*$ of the SDP formulation of \textcite{drausp_lion18} (Table~1
+and Table~2, respectively). $\bar R_{\text{eval}}$ is the mean cumulated reward over $10\,000$
 evaluation episodes with $\epsilon = 0$, reported as mean $\pm$ one standard deviation across
 those episodes. The monotonicity columns report the final ratio of
 satisfied pairs ($10\,000$ pairs per axis) for the Standard-DQN; the Lattice-DQN satisfies every
 check exactly by construction (ratio $1.00$ throughout) and is therefore omitted there. The
-runtime columns are wall-clock seconds for the $20\,000$ training episodes and the $10\,000$
+runtime columns are wall-clock seconds for the $10\,000$ training episodes and the $10\,000$
 evaluation episodes, given as Standard-DQN\,/\,Lattice-DQN; entries marked $\dagger$ were
 distorted by concurrent load on the shared machine and are not representative.
 
@@ -108,7 +110,7 @@ distorted by concurrent load on the shared machine and are not representative.
   \centering
   \footnotesize
   \setlength{\tabcolsep}{4pt}
-  \caption{Results for the \texttt{lion18s} instances that require scheduling
+  \caption[Results on the \texttt{lion18s} scheduling instances]{Results for the \texttt{lion18s} instances that require scheduling
     ($\text{len}(q) < K$; blocks \texttt{SA} $K=4$, \texttt{SB} $K=8$, \texttt{SC} $K=12$).
     $Z^*$ from \textcite{drausp_lion18}, Table~2.}
   \label{tab:results-s}
@@ -159,7 +161,7 @@ distorted by concurrent load on the shared machine and are not representative.
   \centering
   \footnotesize
   \setlength{\tabcolsep}{4pt}
-  \caption{Results for the \texttt{W} instances (\texttt{lion18w}; blocks \texttt{WA} $K=4$,
+  \caption[Results on the \texttt{lion18w} accept/reject instances]{Results for the \texttt{W} instances (\texttt{lion18w}; blocks \texttt{WA} $K=4$,
     \texttt{WB} $K=8$, \texttt{WC} $K=12$, all with $\text{len}(q) = K$, i.e.\ accept/reject only).
     $Z^*$ from \textcite{drausp_lion18}, Table~1.}
   \label{tab:results-w}
