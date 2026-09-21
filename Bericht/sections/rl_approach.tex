@@ -145,7 +145,7 @@ At every decision point, a Q-learning agent should be able to read off, directly
 how good each action is. This requires the state to include the request itself, so that the agent
 knows both the reward and the resource demand it is deciding about.
 
-\subsection{Learning the optimal policy via Q-learning}
+\subsection{Learning the optimal policy via (deep) Q-learning}
 In Q-learning, we try to learn the optimal action-value function
 \[
   Q^*(s,a) = \max_\pi \; \mathbb{E}\Big[\, \sum_{t'=t}^{T_d} \gamma^{t'-t} \cdot \mathcal{R}(s_{t'}, a_{t'}) \;\Big|\; s_t = s,\, a_t = a \,\Big],

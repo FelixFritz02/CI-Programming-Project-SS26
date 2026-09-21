@@ -1,0 +1,400 @@
+%==============================================================================
+%  Vortrag: Exploiting Monotonicity in the Q-Function for DRAUSP via RL
+%  Beamer-Vorlage, fasst die Ergebnisse des Berichts (../Bericht/main.pdf) zusammen.
+%
+%  Kompilieren:  latexmk -pdf main.tex     (biber wird automatisch aufgerufen)
+%  oder:         pdflatex main  ->  biber main  ->  pdflatex main  ->  pdflatex main
+%==============================================================================
+\documentclass[aspectratio=169, 11pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath, amssymb, mathtools}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, decorations.pathreplacing, fit, backgrounds}
+
+%------------------------------------------------------------------------------
+%  Farbschema (konsistent mit der Projektvorlage / RPTU)
+%------------------------------------------------------------------------------
+\definecolor{tugreen}{RGB}{0, 110, 80}
+\definecolor{alertred}{RGB}{180, 0, 0}
+\definecolor{extramethod}{RGB}{180, 80, 0}
+
+\setbeamercolor{structure}{fg=tugreen}
+\setbeamercolor{frametitle}{bg=tugreen, fg=white}
+\setbeamercolor{title}{bg=tugreen, fg=white}
+\setbeamercolor{title separator}{fg=tugreen}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{caption}[numbered]
+\setbeamerfont{caption}{size=\scriptsize}
+
+% dezente Fußzeile
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,left]{author in head/foot}%
+      \hspace*{1.5ex}\insertshortauthor%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,right]{title in head/foot}%
+      \insertshorttitle\hspace*{2ex}\insertframenumber\,/\,\inserttotalframenumber\hspace*{1.5ex}%
+    \end{beamercolorbox}%
+  }\vskip0pt%
+}
+
+%------------------------------------------------------------------------------
+%  Literatur
+%------------------------------------------------------------------------------
+\usepackage[backend=biber, style=numeric, sorting=none, maxbibnames=2, maxcitenames=1, giveninits=true]{biblatex}
+\addbibresource{mybib.bib}
+
+%------------------------------------------------------------------------------
+%  Abkürzungen
+%------------------------------------------------------------------------------
+\newcommand{\drausp}{\textsc{drausp}}
+\newcommand{\Chat}{\hat{C}}
+\newcommand{\Avalid}{\mathcal{A}^{\text{valid}}_s}
+
+%------------------------------------------------------------------------------
+%  Titelseite
+%------------------------------------------------------------------------------
+\title[Monotonicity in the Q-Function for \drausp]{Exploiting Monotonicity in the Q-Function\\for \drausp{} via Reinforcement Learning}
+\subtitle{Standard-DQN vs.\ Deep-Lattice-DQN -- Zusammenfassung der Ergebnisse}
+\author[N.\ Fritz, F.\ Fritz]{Niklas Fritz \and Felix Fritz}
+\institute[RPTU]{RPTU Kaiserslautern-Landau}
+\date{\today}
+
+%==============================================================================
+\begin{document}
+%==============================================================================
+
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+\begin{frame}{Gliederung}
+  \tableofcontents
+\end{frame}
+
+%==============================================================================
+\section{Problem \& Modellierung}
+%==============================================================================
+
+\begin{frame}{Das \drausp-Problem}
+  \textbf{Dynamic Request Acceptance and Unsplittable Scheduling Problem}
+
+  \begin{block}{Setting}
+    $K$ Ressourcen mit Kapazitäten $C_k$; $T_d$ Anfragen treffen \emph{sequenziell} ein.
+    Anfrage $i$: Erlös $r_i \ge 0$ und (relativer) Bedarfsvektor $q_i \in \mathbb{N}_0^K$ der Länge $\ell_i$.
+  \end{block}
+
+  \begin{block}{Entscheidung -- sofort und unwiderruflich}
+    \begin{itemize}
+      \item \textbf{Ablehnen} $\rightarrow$ Erlös $0$
+      \item \textbf{Akzeptieren ab Slot $a$} $\rightarrow$ Erlös $r_i$, Kapazitäten $\Chat_{a+j-1}\!\mathrel{-}=q_{i,j}$
+    \end{itemize}
+  \end{block}
+
+  \textbf{Ziel:} Gesamterlös über den Horizont maximieren, ohne Kapazität $C_k$ zu verletzen.
+
+  \medskip
+  {\small Exakte stochastische DP löst \drausp{} optimal~\cite{drausp_lion18}, wird aber mit wachsendem
+  $K$ und $T_d$ intraktabel $\Rightarrow$ Funktionsapproximation via RL.}
+\end{frame}
+
+\begin{frame}{Modellierung als MDP}
+  \begin{block}{Zustand $s \in \mathcal{S} \subseteq \mathbb{R}^{2K+2}$}
+    \[
+      s = \bigl(\,t,\ \Chat_1,\dots,\Chat_K,\ r,\ q_1,\dots,q_K\,\bigr)
+    \]
+    Zeitschritt $t$, Restkapazitäten $\Chat_k$, aktuelle Anfrage $(r,q)$ -- $q$ mit Nullen auf Länge $K$ gepolstert.
+  \end{block}
+
+  \begin{columns}[T]
+    \column{0.52\textwidth}
+      \textbf{Aktion} $a \in \{0,1,\dots,K\}$
+      \begin{itemize}
+        \item $a=0$: ablehnen
+        \item $a>0$: ab Slot $a$ einplanen
+      \end{itemize}
+      \textbf{Zulässig}, falls $a+\ell-1 \le K$ und $\Chat_{a+j-1}\ge q_j\ \forall j$.
+    \column{0.48\textwidth}
+      \textbf{Reward}
+      \[
+        \mathcal{R}(s,a)=
+        \begin{cases}
+          r    & a \in \Avalid \setminus\{0\}\\
+          0    & a = 0\\
+          -100 & a \notin \Avalid
+        \end{cases}
+      \]
+  \end{columns}
+
+  \medskip
+  \[
+    \pi^* = \arg\max_{\pi}\ \mathbb{E}_{\pi}\!\left[\sum_{t=1}^{T_d}\gamma^{\,t-1}\,\mathcal{R}(s_t,a_t)\right]
+  \]
+\end{frame}
+
+\begin{frame}{Baseline: Deep Q-Network + zwei Anpassungen}
+  \textbf{Standard-DQN}~\cite{mnih2015}: $Q(s,\cdot\,|\,\theta)$ approximiert alle Aktionswerte gleichzeitig;
+  Replay Buffer, Target-Netz (Soft-Update $\theta^-\!\leftarrow\tau\theta+(1-\tau)\theta^-$), MSE-Bellman-Loss.
+
+  \begin{block}{1. Action Masking}
+    \[
+      Q(s,a) \leftarrow -\infty \quad\text{für } a \notin \Avalid
+      \qquad\Rightarrow\qquad \arg\max \text{ wählt nie unzulässig}
+    \]
+    Auch das $\epsilon$-Greedy-Sampling nur über $\Avalid$.
+  \end{block}
+
+  \begin{block}{2. Reject-biased Exploration}
+    Uniformes Sampling über $\Avalid$ akzeptiert zu oft ($P(\text{reject})=\tfrac{1}{K-\ell+2}$).
+    Gegenmaßnahme: $P(a{=}0)=\alpha$, Rest gleichverteilt. In den Experimenten $\alpha = 0.75$.
+  \end{block}
+\end{frame}
+
+%==============================================================================
+\section{Monotonie in der Q-Funktion}
+%==============================================================================
+
+\begin{frame}{Welche Monotonie steckt im Problem?}
+  Erwartete monotone Beziehungen zwischen Zustandskomponente und $Q(s,a)$:
+
+  \medskip
+  \begin{center}
+  \begin{tabular}{c l l}
+    \toprule
+    Komponente & Richtung & Begründung \\
+    \midrule
+    $t$    & \textbf{fallend}   & weniger verbleibende Zeit $\Rightarrow$ weniger künftiger Erlös \\
+    $C_k$  & \textbf{steigend}  & mehr Restkapazität $\Rightarrow$ mehr Spielraum \\
+    $r$    & \textbf{steigend}  & höherer Erlös nie schlechter bewertet \\
+    $q_k$  & \textbf{fallend}   & höherer Bedarf schränkt Kapazität stärker ein \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \medskip
+  \begin{alertblock}{Kernidee des Projekts}
+    Statt zu \emph{hoffen}, dass ein generisches Netz diese Struktur lernt (oder sie nur per Straf\-term
+    zu \emph{ermutigen}), erzwingen wir sie \textbf{strukturell in der Architektur} -- garantiert zur Inferenzzeit.
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{Monotonie-Test}
+  Zustandsraum zu groß für exakte Prüfung $\Rightarrow$ \textbf{empirischer Test} auf gesampelten Zuständen.
+
+  \begin{enumerate}
+    \item Trajektorien unter zufälliger, gültiger Policy ausrollen, alle besuchten Zustände $s$ sammeln.
+    \item Pro Zustand je einen \emph{verbesserten} Vergleichszustand $s'$ bilden:
+      \[
+        C{:}\ C' > C, \qquad t{:}\ t' = t-1, \qquad r{:}\ r' = 2r, \qquad q{:}\ q' = q/2,
+      \]
+      plus ein \emph{gemischtes} Paar (alle vier gleichzeitig verbessert).
+    \item $Q$-Werte aktionsweise vergleichen (maskierte Aktionen ausgeschlossen).
+  \end{enumerate}
+
+  \begin{block}{Monotonie-Score (pro Achse)}
+    Anteil der $(s,a)$-Paare, für die die erwartete Ungleichung gilt.
+    $1.00$ = perfekte Monotonie, $<1$ = Verletzungen. Fünf Scores: $t,\ C,\ r,\ q,\ \text{mixed}$.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Deep-Lattice-DQN -- Monotonie by Construction}
+  \small Deep Lattice Network nach \textcite{you2017}, angewandt auf die $Q$-Funktion:
+  \medskip
+  \begin{columns}[T]
+    \column{0.6\textwidth}
+      \textbf{Layer 0 -- Kalibratoren.} Jedes Feature $\to$ monotone, stückweise-lineare Abbildung nach $[0,1]$;
+      fallende Features ($t,q_k$) werden gespiegelt $\Rightarrow$ danach nur noch \emph{steigend}.
+
+      \medskip
+      \textbf{Layer 1 -- Intra-Ressource.} Pro Ressource $k$ drei Gruppen
+      $A_k{=}[t,r,C_k]$, $B_k{=}[C_k,q_k,r]$, $C_k{=}[t,C_k,q_k]$;
+      je ein Ensemble aus $2{\times}2{\times}2$-Lattices, Mittelung $\Rightarrow$ $3K$ Skalare.
+
+      \medskip
+      \textbf{Layer 2 -- Cross-Ressource.} $K$ Tripel (rotierender Offset) koppeln Gruppen \emph{verschiedener} Ressourcen.
+
+      \medskip
+      \textbf{Output.} Lineare Schicht, Gewichte nach jedem Schritt auf $\ge 0$ geklemmt.
+    \column{0.4\textwidth}
+      \begin{block}{Trilineare Auswertung}
+        \[
+          \hat{Q}(x) = \!\!\sum_{i,j,k \in \{0,1\}}\!\! w_{ijk}(x)\,\theta_{ijk}
+        \]
+        \centering\footnotesize konvexe Kombination der $2^3$ Ecken
+      \end{block}
+      \begin{block}{Parameterzahl}
+        \footnotesize
+        \[
+          N = (5K{+}2)P + 24KU_1 + 8KU_2 + (KU_2{+}1)D
+        \]
+        \centering $K{=}4,\ P{=}8,\ U_1{=}4,\ U_2{=}2,\ D{=}4$\\[2pt] $\Rightarrow\ N = 660$
+      \end{block}
+  \end{columns}
+
+  \medskip
+  {\footnotesize $\Rightarrow$ Standard-DQN-Schichten werden pro Instanz auf die \emph{gleiche} Parameterzahl kalibriert (fairer Vergleich).}
+\end{frame}
+
+%==============================================================================
+\section{Experimente}
+%==============================================================================
+
+\begin{frame}{Versuchsaufbau}
+  \begin{block}{Instanzen}
+    \drausp-Benchmarks aus \textcite{drausp_lion18}: Blöcke \texttt{SA/SB/SC} (mit Scheduling, $\ell<K$)
+    und \texttt{WA/WB/WC} (nur accept/reject, $\ell=K$), $K \in \{4,8,12\}$, $T_d \in \{5,10,20,50\}$.
+  \end{block}
+
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+      \textbf{Training (beide Netze identisch)}
+      \begin{itemize}
+        \item Reject-Bias $\alpha = 0.75$, $\gamma = 0.99$
+        \item $\epsilon\!: 1.0 \to 0.05$ über $T_d\cdot 1000$ Schritte
+        \item Replay Buffer $50\,000$, Warm-up $500$
+        \item Batch $64$, ein Update / $4$ Schritte
+        \item $20\,000$ Trainingsepisoden
+      \end{itemize}
+    \column{0.5\textwidth}
+      \textbf{Evaluation}
+      \begin{itemize}
+        \item Gewichte eingefroren, $\epsilon = 0$
+        \item Mittel über $10\,000$ Episoden
+        \item Monotonie: $10\,000$ Paare pro Achse
+      \end{itemize}
+      \medskip
+      \textbf{Fairer Vergleich}
+      \begin{itemize}
+        \item Standard-DQN-Schichtgrößen pro Instanz an Lattice-Parameterzahl angepasst
+      \end{itemize}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Standard-DQN -- Training \& Monotonie (SB05, $T_d=50$)}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth,height=0.66\textheight,keepaspectratio]{figures/standard_DQN_mono_SB5_all.png}
+    \caption{Kumulierter Reward und Monotonie-Scores über $10\,000$ Trainingsepisoden.
+      $C_k$ nahezu sofort perfekt; $q_k$ bricht zunächst auf $\approx 0$ ein und erholt sich auf $>0.9$.}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Standard-DQN -- Evaluationsphase (SB05, $T_d=50$)}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth,height=0.66\textheight,keepaspectratio]{figures/standard_DQN_eval_SB5.png}
+    \caption{Kumulierter Reward pro Episode in der Evaluationsphase ($\epsilon = 0$, eingefrorene Gewichte);
+      stabiler Mittelwert nahe dem optimalen $Z^* = 12.60$.}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Deep-Lattice-DQN -- Training (SB05, $T_d=50$)}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth,height=0.66\textheight,keepaspectratio]{figures/Deep_Lattice_mono_SB5_all.png}
+    \caption{Alle Monotonie-Scores sind \textbf{von Beginn an $1.00$} (überlappende Linien am oberen Rand) --
+      durch die Architektur erzwungen. Der Reward konvergiert langsamer; die Evaluationslücke zum
+      Standard-DQN zeigt die Ergebnistabelle.}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Numerische Ergebnisse -- ausgewählte Instanzen}
+  \small
+  $\bar R_{\text{eval}}$: Mittel $\pm$ Std.\ über $10\,000$ Episoden ($\epsilon{=}0$); $Z^*$: optimaler Erwartungswert (SDP,~\cite{drausp_lion18}).
+  \medskip
+  \begin{center}
+  \begin{tabular}{l c c c c c}
+    \toprule
+    Instanz & $T_d$ & $Z^*$ & Standard-DQN & Lattice-DQN & Lat.\ \% von $Z^*$ \\
+    \midrule
+    SA01 & 10 & 5.08  & $5.08 \pm 0.85$  & $5.03 \pm 0.86$  & 99\% \\
+    SA08 & 20 & 10.16 & $10.16 \pm 1.18$ & $10.08 \pm 1.23$ & 99\% \\
+    SA09 & 50 & 20.38 & $19.40 \pm 1.59$ & $15.58 \pm 1.88$ & 76\% \\
+    SB05 & 50 & 12.60 & $12.05 \pm 0.87$ & $\phantom{0}7.77 \pm 1.49$ & 62\% \\
+    WA06 & 50 & 15.36 & $14.44 \pm 1.43$ & $\phantom{0}9.07 \pm 1.83$ & 59\% \\
+    WC03 & 50 & \phantom{0}2.13 & $\phantom{0}2.02 \pm 0.30$ & $\phantom{0}1.60 \pm 0.31$ & 75\% \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \medskip
+  \begin{itemize}
+    \item Standard-DQN: $90$--$100\%$ von $Z^*$ auf fast allen Instanzen, überall $\ge$ Lattice-DQN.
+    \item Lattice-DQN: gleichauf bei einfachen Instanzen, deutlicher Abfall bei großem $T_d$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Monotonie \& Laufzeit -- Gesamtbild}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+      \begin{block}{Monotonie (Standard-DQN, final)}
+        \begin{tabular}{l l}
+          $C_k$   & $\approx 1.00$ (sehr früh) \\
+          $t$     & meist $>0.9$ \\
+          mixed   & $\approx 1.00$ \\
+          $r$     & nur teilweise \\
+          $q_k$   & am schwächsten, $<0.6$ \\
+                  & \small(SA10, WA04, WC03)
+        \end{tabular}
+        \medskip
+        Lattice-DQN: $1.00$ auf allen Achsen, per Konstruktion.
+      \end{block}
+    \column{0.5\textwidth}
+      \begin{block}{Laufzeit}
+        Lattice-DQN-Training ca.\ \textbf{$5$--$12\times$ langsamer} als das
+        parametergleiche Standard-DQN.
+        \\[0.4em]
+        Ursache: Constraint-Projektion pro Schritt + viele kleine Lattice-Auswertungen.
+      \end{block}
+      \begin{block}{Robustheit}
+        Standard-DQN robust gegenüber Hyperparametern;
+        Lattice-DQN braucht deutlich mehr Feintuning ($\epsilon$-Decay, Reject-Bias, Episodenzahl).
+      \end{block}
+  \end{columns}
+\end{frame}
+
+%==============================================================================
+\section{Fazit}
+%==============================================================================
+
+\begin{frame}{Fazit}
+  \begin{block}{Ergebnisse}
+    \begin{itemize}
+      \item Die Deep-Lattice-Architektur \textbf{garantiert} Monotonie in $t, C_k, r, q_k$ -- Score $1.00$ ab Episode~0.
+      \item Ein Standard-DQN lernt Monotonie in $C_k$, $t$ und den gemischten Paaren fast perfekt,
+            in $r$ und besonders $q_k$ aber nur unvollständig.
+      \item \textbf{Preis der Garantie:} eingeschränkte Funktionsklasse $\Rightarrow$ niedrigerer Reward
+            (v.a.\ bei großem $T_d$) und $5$--$12\times$ längeres Training.
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{Einordnung}
+    Der strukturelle Monotonie-Zwang zahlt sich hier \emph{nicht} über die reine Performance aus --
+    er ist attraktiv, wenn garantierte Monotonie wichtiger ist als der letzte Prozentpunkt Erlös.
+  \end{block}
+
+  {\small\textbf{Ausblick:} allgemeinerer Aktionsraum, bessere Trainingsschemata für Lattice-Netze, Hyperparameter-Analyse.}
+\end{frame}
+
+\begin{frame}[allowframebreaks]{Referenzen}
+  \printbibliography[heading=none]
+\end{frame}
+
+\begin{frame}[plain]
+  \begin{center}
+    {\Huge\textbf{Vielen Dank!}}\\[1em]
+    {\large Fragen?}
+  \end{center}
+\end{frame}
+
+\end{document}
