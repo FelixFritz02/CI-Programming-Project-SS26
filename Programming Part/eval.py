@@ -73,9 +73,9 @@ from models.deep_lattice import DeepLatticeNetwork
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INSTANCES_DIR = PROJECT_ROOT / "instances"
 DEFAULT_TD_MAPPING = Path(__file__).resolve().parent / "td_mapping.csv"
-DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results_standard_dqn.csv"
+DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results_deep_lattice_dynamic_update.csv"
 
-MODEL_CHOICES = ["standard_dqn"]
+MODEL_CHOICES = ["deep_lattice"]
 
 
 # =========================================================================
@@ -87,12 +87,17 @@ MODEL_CHOICES = ["standard_dqn"]
 # "python eval.py run --model ...") greift stattdessen die CLI (siehe unten
 # in main()), diese Werte werden dann ignoriert.
 # =========================================================================
-MODEL = "standard_dqn"          # einer aus MODEL_CHOICES
+MODEL = "deep_lattice"          # einer aus MODEL_CHOICES
 TRAIN_EPISODES = 20_000
 EVAL_EPISODES = 10_000
 
-SUBSETS = None                  # z.B. ["lion18s"], None = alle Unterordner (lion18s/lion18w/wendtris)
-ONLY = None                     # z.B. ["SA01", "SA02"], None = alle Instanzen im/den Subset(s)
+SUBSETS = None                 # z.B. ["lion18s"], None = alle Unterordner (lion18s/lion18w/wendtris)
+# Repräsentative Auswahl zum Testen des dynamischen train_every (T_d/2.5):
+# SA01 (K=4, T_d=10, klein/Kontrolle), SC01 (K=12, T_d=5, kleinster T_d),
+# SB05 & WC03 (T_d=50, durch längeres 20k-Training am stärksten destabilisiert),
+# WA06 (T_d=50, ebenfalls destabilisiert), SA12 & WA03 (T_d=50, hatten
+# umgekehrt von 20k profitiert -> prüfen, ob die Regel das nicht verschlechtert).
+ONLY = ["SA01", "SC01", "SB05", "WC03", "WA06", "SA12", "WA03"]
 LIMIT = None                    # z.B. 3, um erst mal nur wenige Instanzen zum Testen zu laufen
 
 DEFAULT_T_D = None              # Fallback-T_d für Instanzen ohne Eintrag in td_mapping.csv (z.B. wendtris)
@@ -108,13 +113,13 @@ MODEL_KWARGS = {}               # Modell-kwargs, z.B. {"keypoints": 10} (nur fü
 # Nur wirksam wenn MODEL == "standard_dqn". Wird pro Instanz automatisch die
 # Parameterzahl von MATCH_PARAMS_TO berechnet und dazu passende hidden_dims gesucht
 # (überschreibt ein evtl. in MODEL_KWARGS gesetztes "hidden_dims"). None = aus.
-MATCH_PARAMS_TO = "deep_lattice"          # z.B. "deep_lattice"
+MATCH_PARAMS_TO = None         # z.B. "deep_lattice"
 MATCH_PARAMS_TO_KWARGS = {}     # kwargs für das Zielmodell, z.B. {"keypoints": 8, "lattice_units": 4}
 MATCH_DEPTH = 2                 # Anzahl Hidden-Layer für die standard_dqn-Suche
 MATCH_REQUIRE_FUNNEL = True     # h1 >= h2 >= ... erzwingen (wie bisherige (32,16)-Architektur)
 
 OUT_CSV = str(DEFAULT_OUT_CSV)  # liegt fest unter Programming Part/eval_results_lattice.csv
-RESUME = False                  # True = an vorhandener OUT_CSV fortsetzen, fertige Instanzen überspringen
+RESUME = True                  # True = an vorhandener OUT_CSV fortsetzen, fertige Instanzen überspringen
 SEED = None
 HISTORIES_DIR = None            # z.B. "histories" um reward/depth/mono-Verläufe je Instanz zu speichern
 MODELS_DIR = None               # z.B. "trained_models" um die trainierten Gewichte je Instanz zu speichern
@@ -226,9 +231,18 @@ def _coerce_ranges(kwargs: dict) -> dict:
 
 
 def _instance_agent_kwargs(agent_kwargs: dict, T_d: int) -> dict:
-    """Setzt die Epsilon-Decay-Länge pro Instanz auf T_d * 1000."""
+    """Setzt Epsilon-Decay-Länge und Trainingsfrequenz pro Instanz in Abhängigkeit von T_d.
+
+    epsilon_decay_steps = T_d * 1000, wie bisher.
+    train_every = T_d / 2.5: Episodenlänge skaliert ungefähr mit T_d, wodurch bei
+    festem train_every große-T_d-Instanzen pro Episode deutlich mehr Trainings-
+    schritte bekommen als kleine. Die Skalierung gleicht das aus, sodass die
+    Update-Dichte pro Episode über verschiedene T_d hinweg ungefähr konstant
+    bleibt (bei T_d=10 ergibt sich train_every=4, der bisherige feste Default).
+    """
     kwargs = dict(agent_kwargs)
     kwargs["epsilon_decay_steps"] = max(1, int(T_d * 1000))
+    kwargs["train_every"] = max(1, round(T_d / 2.5))
     return kwargs
 
 
