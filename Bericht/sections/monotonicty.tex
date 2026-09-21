@@ -33,7 +33,7 @@ $Q$-network respects monotonicity in the first place. We introduce such a monoto
 \subsection{Monotonicity test}
 \label{subsec:monotonicity-test}
 
-Since the state space of \ac{drausp} is far too large to check the postulated relations exactly for every state, we will test monotonicity empirically on a sample of states (cf.\ \texttt{monotonicity\_evaluation.py}).
+Since the state space of \ac{drausp} is far too large to check the postulated relations exactly for every state, we will test monotonicity empirically on a sample of states.
 
 To do so, we first roll out several trajectories in the environment under a random but valid policy, i.e., an episode is played out end to end by repeatedly sampling a uniformly random action from the valid action set $\mathcal{A}_s^{\text{valid}}$, and collect every state visited along the way.
 
@@ -44,7 +44,7 @@ For every visited state $s=(t,C,r,q)$, we construct one comparison state $s'$ pe
   \item $r$: $s_r'$ has twice the reward ($r' = 2r$),
   \item $q$: $s_q'$ has half of the resource demand ($q' = q/2$).
 \end{itemize}
-In addition, we build a fifth pair $(s,s_{\text{mixed}})$ in which all of the four components are improved simultaneously ($t-1$, increased $C$, doubled $r$, halved $q$), so that interactions between the axes are covered as well.
+In addition, we build a fifth pair $(s,s_{\text{mixed}}')$ in which all of the four components are improved simultaneously ($t-1$, increased $C$, doubled $r$, halved $q$), so that interactions between the axes are covered as well.
 
 For every pair $(s,s')$, both states are propagated through the current Q-network and the resulting $Q$-values are compared action-wise, with invalid actions excluded via the already masked $Q$-values. 
 

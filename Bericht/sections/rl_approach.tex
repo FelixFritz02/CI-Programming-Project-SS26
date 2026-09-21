@@ -107,23 +107,21 @@ Given an MDP the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes th
   \end{equation*}
 Solving this optimization directly is a hard task because we have to find the optimal policy $\pi^*$ over the whole state space and the policy $\pi$ is itself part of the expectation. Instead, we will use Q-learning to learn the optimal action-value function $Q^*(s,a)$, which allows us to derive the optimal policy $\pi^*$ by acting greedily with respect to it.
 
-\textbf{Comparison with the state/action space formulation in the DRAUSP paper.}
-\textcite{drausp_lion18} also formulate \acs{drausp} as an \acs{mdp}, but with a considerably
+\textbf{Comparison with the state/action space formulation given by \textcite{drausp_lion18}.}
+They also formulate \acs{drausp} as an \acs{mdp}, but with a considerably
 leaner state space. Their state space only contains the capacity vector
-$$s = (\hat C_1,\dots,\hat C_K) \in S = \{0,\dots,C_1\}\times\dots\times\{0,\dots,C_K\}$$. The
+$$s = (\hat C_1,\dots,\hat C_K) \in S = \{0,\dots,C_1\}\times\dots\times\{0,\dots,C_K\}.$$ The
 time index $t$ is not part of the state vector at all, but only a separate, downward-counting step
 index of their recursion, indicating how many requests are still to arrive. In particular, the
 current request $[r,q]$ is \emph{not} contained in the state. Our state $s$ (Equation~\eqref{eq:state}), by contrast, contains $r$ and $q$
 explicitly, while our action is reduced to the lean start slot $a \in \{0,\dots,K\}$.
-Table~\ref{tab:mdp-comparison} summarizes this structural difference; \textcolor{red}{\emph{how} the two
-formulations are subsequently solved (exact dynamic programming vs.\ function approximation via
-\acs{dqn}) is discussed separately in the section on the DQN agent.}
+Table~\ref{tab:mdp-comparison} summarizes this structural difference.
 
 \begin{table}[htbp]
   \centering
   \begin{tabular}{p{0.20\textwidth}p{0.36\textwidth}p{0.36\textwidth}}
     \toprule
-     & \textbf{Paper} & \textbf{Our Approach} \\
+     & \textbf{\textcite{drausp_lion18}} & \textbf{Our Approach} \\
     \midrule
     State    & $s_t = (\hat C_1,\dots,\hat C_K)$
              & $s = [t,\hat C_1,\dots,\hat C_K,r,q_1,\dots,q_K]$ \\
@@ -170,7 +168,7 @@ The parameters $\theta_{DQN}$ of the DQN are updated by minimizing a loss functi
 \]
 and define the loss function as the mean squared error between the current Q-value and the target Q-value:
 \[
-  L(\theta_{DQN}) = \sum_{(s_t, a_t, r_{t+1}, s_{t+1}) \in \mathcal{D'}} \Big[ \big( Q(s_t, a_t \vert \theta_{DQN}) - (r_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a' \vert \theta_{DQN}^-)) \big)^2 \Big],
+  L(\theta_{DQN}) = \frac{1}{|\mathcal{D'}|}\sum_{(s_t, a_t, r_{t+1}, s_{t+1}) \in \mathcal{D'}} \Big[ \big( Q(s_t, a_t \vert \theta_{DQN}) - (r_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a' \vert \theta_{DQN}^-)) \big)^2 \Big],
 \]
 where $\mathcal{D'}$ is a random sample from the replay buffer that stores the agent's experiences $(s_t, a_t, r_{t+1}, s_{t+1})$.
 \subsubsection{Action Masking}

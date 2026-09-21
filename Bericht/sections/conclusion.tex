@@ -17,9 +17,14 @@ on the other hand, enforces monotonicity by design and therefore satisfies all m
 But using the Lattice-\acs{dqn} comes with a trade-off: the more constrained function class of the Lattice-\acs{dqn}
 makes it harder to learn the optimal policy. This leads to a slower convergence and a slightly worse performance in the end.\\
 
-Future work could focus on improving the performance of the Lattice-\acs{dqn} by using a more complex architecture, e.g. by 
-adding more layers or increasing the number of lattices per layer. Another approach could be to use a hybrid architecture, 
-where the first layers are standard feedforward layers and the last layers are lattice layers. This would allow the network 
-to learn a more complex function while still enforcing monotonicity in the last layers. 
+Future work could focus on improving the performance of the Lattice-\acs{dqn} by using a more complex architecture, e.g. by
+adding more layers or increasing the number of lattices per layer. Another approach could be to enforce monotonicity only on a subset of the features.
+In this case one could use a hybrid architecture,
+where non-monotonic features are first processed by standard feedforward layers, while the monotonicity-relevant features
+bypass these layers (or only pass through monotone transformations) and are combined with the resulting representation only
+at the final lattice layers. This would allow the network to learn a more complex function from the non-monotonic features
+while still enforcing end-to-end monotonicity with respect to the relevant inputs. Note that simply stacking feedforward
+layers before lattice layers on all inputs would not preserve this guarantee, since composing a monotone function with a
+non-monotone one is generally not monotone.
 In our numerical experiments the Standard \acs{dqn} still manages to learn monotonicity, but it is not guaranteed to do so.
 One could test if this holds true if the network architecture is changed or instances get larger and more complex.
