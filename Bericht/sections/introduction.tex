@@ -28,13 +28,13 @@ value of accepting a request today can only be judged against the (unknown) valu
 still to come. \textcite{drausp_lion18} show that exact stochastic dynamic programming solves
 \acs{drausp} optimally, but that this approach becomes computationally intractable as the state
 space grows with $K$ and the number of requests.
-This motivates a reinforcement-learning-based, function-
+This motivates a reinforcement-learning-based, function
 approximation approach pursued in this report. 
 
 In addition, the problem exhibits domain structure
 that a generic learned model does not respect automatically -- e.g., more remaining capacity should
 never make a state look worse.
-In this paper we exploit whether make usage of meaningful structure explicitly by enforcing a model to incorporate this structure rather than hoping a model learns it, improves the reliability and sample results of the learned policy. Doing so, we will use some Lattice Networks for function approximation.
+In this paper we exploit whether make usage of meaningful structure explicitly by enforcing a model to incorporate this structure rather than hoping a model learns it, improves the reliability and sample results of the learned policy. Doing so, we will use some Lattice Networks for function approximation in context of reinforcement learning.
 
 
 
@@ -68,7 +68,7 @@ and a target network to stabilize training. This is exactly the architecture tha
 for our models later on.
 
 \textbf{Monotonicity constraints in learned models.} A plain \acs{dqn} has no built-in guarantee
-that $Q(s,a)$ respects domain knowledge such as ``more capacity is never worse'' -- such
+that $Q(s,a)$ respects domain knowledge such as ``more capacity is never worse''. Such
 relationships can, at best, be encouraged through additional loss terms, without any guarantee
 that they hold at inference time. \textcite{you2017} instead propose enforcing monotonicity
 \emph{structurally}, in the architecture itself: \emph{Deep Lattice Networks} alternate layers of
