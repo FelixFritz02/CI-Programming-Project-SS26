@@ -1,7 +1,7 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-We developed a represenation of the \acs{drausp} as a finite-horizon \acs{mdp}, which enables us
+We developed a representation of the \acs{drausp} as a finite-horizon \acs{mdp}, which enables us
 to use reinforcement learning techniques to learn acceptance and scheduling policies. For optimization, we used
 a value-based deep \acs{rl} approach, specifically Q-learning with a deep neural network as function approximator.
 We constructed a stable baseline approach in Section \ref{sec:rl-approach} using a Standard \acs{dqn}. We
@@ -11,7 +11,7 @@ As a second approach, we took advantage of the known monotonicity relations pres
 and constructed a monotonicity-aware \acs{dqn}, using lattice layers. We built up a deep lattice
 network architecture that enforces monotonicity by design, and again evaluated its performance 
 and monotonicity behaviour on the same benchmark instances as the Standard \acs{dqn}.\\
-We saw that even without any knowledge about the problem strucure at the beginning, the 
+We saw that even without any knowledge about the problem structure at the beginning, the
 Standard \acs{dqn} still manages to learn monotonicity. The Lattice-\acs{dqn} 
 on the other hand, enforces monotonicity by design and therefore satisfies all monotonicity tests exactly. 
 But using the Lattice-\acs{dqn} comes with a trade-off: the more constrained function class of the Lattice-\acs{dqn}

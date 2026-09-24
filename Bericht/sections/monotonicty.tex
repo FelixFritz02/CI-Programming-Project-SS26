@@ -27,7 +27,7 @@ where $s_{t}'$, $s_{C}'$, $s_{r}'$, and $s_{q}'$ are the corresponding improved 
 A standard DQN approximates $Q(s,a)$ with a generic feedforward
 network and has no guarantee of respecting those relationships.
 To make use of this domain knowledge, we choose to enforce the monotonicity relations \textit{structurally} in the network architecture, rather than hoping a generic network learns them. Remark that this is a stronger approach than simply encouraging monotonicity as a soft penalty term in the loss function.
-Before presenting this structural solution in detail, it is worth asking whether it is actually needed: a generic network could in principle also learn the relations postulated above implicitly while training. Answering this question, it first requires a test that can measure how well an arbitrary 
+Before presenting this structural solution in detail, it is worth asking whether it is actually needed: a generic network could in principle also learn the relations postulated above implicitly while training. Answering this question first requires a test that can measure how well an arbitrary
 $Q$-network respects monotonicity in the first place. We introduce such a monotonicity test below and later apply it to both the standard DQN and the Lattice architectures presented in this chapter, so that their monotonicity compliance can be compared quantitatively.
 
 \subsection{Monotonicity test}

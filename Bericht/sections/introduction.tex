@@ -11,9 +11,9 @@ across \emph{several} resources with different capacities at once, which substan
 decision problem.
 
 The problem of interest in this paper is the \emph{Dynamic Request Acceptance and Unsplittable Scheduling
-Problem} (\acs{drausp}), where the task is to decide whether to accept or reject incoming requests with specific ressource requirements and revenue and how to schedule them across multiple ressources in order to  maximize the cumulated reward. The main difficulty in this problem is that it requires making irrevocable decisions, before knowing which requests will arrive in the future. 
+Problem} (\acs{drausp}), where the task is to decide whether to accept or reject incoming requests with specific resource requirements and revenue and how to schedule them across multiple resources in order to  maximize the cumulated reward. The main difficulty in this problem is that it requires making irrevocable decisions, before knowing which requests will arrive in the future.
 
-In an upfront decision horizon there arrive $T_d \in \mathbb{N}_{>0}$ many requests succesively. Each request is characterized by a tuple $(r,q)$, where $r$ is the immediate positive reward offered for accepting the request and $q = (q_1, q_2, \ldots, q_{len(q)})$ represents the demanded ressource capacities. 
+Over a fixed decision horizon, $T_d \in \mathbb{N}_{>0}$ many requests arrive successively. Each request is characterized by a tuple $(r,q)$, where $r$ is the immediate positive reward offered for accepting the request and $q = (q_1, q_2, \ldots, q_{len(q)})$ represents the demanded resource capacities.
 
 There are $K \in \mathbb{N}_{>0}$ many resources with different capacities $C_k \in \mathbb{N}_{>0}$ for $k = 1, \ldots, K$. 
 
@@ -34,14 +34,14 @@ approximation approach pursued in this report.
 In addition, the problem exhibits domain structure
 that a generic learned model does not respect automatically -- e.g., more remaining capacity should
 never make a state look worse.
-In this paper we exploit whether make usage of meaningful structure explicitly by enforcing a model to incorporate this structure rather than hoping a model learns it, improves the reliability and sample results of the learned policy. Doing so, we will use some Lattice Networks for function approximation.
+In this paper we investigate whether making explicit use of this structure -- by enforcing a model to incorporate it, rather than hoping a model learns it -- improves the reliability and sample efficiency of the learned policy. Doing so, we will use Lattice Networks for function approximation.
 
 
 
 \subsection{Related Work}
 \label{subsec:related-work}
 
-This report builds mainly on two lines of work. The first is formulating the \acs{drausp} as an Markov Decision Process
+This report builds mainly on two lines of work. The first is formulating the \acs{drausp} as a Markov Decision Process
 (\acs{mdp}) and solving it with reinforcement learning, specifically Q-learning. The second is
 incorporating monotonicity constraints into the Q-learning model, so that structural knowledge
 about the problem can be exploited to improve the learning process.

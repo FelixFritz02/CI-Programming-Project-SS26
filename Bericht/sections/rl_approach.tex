@@ -98,10 +98,10 @@ $K=5$, request length $\ell=3$, action $a=2$ and applies the update rule.
     -100, & \text{if } a \notin \mathcal{A}_s^{\text{valid}}
   \end{cases}
 \]
-Selecting an infeasible action, terminates the episode and yields a large negative reward of $-100$ to discourage the agent from taking invalid actions.
+Selecting an infeasible action terminates the episode and yields a large negative reward of $-100$ to discourage the agent from taking invalid actions.
 
 \textbf{Objective.} 
-Given an MDP the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes the expected cumulative reward over the decision horizon. In our case, the objective is to maximize the total revenue over the decision horizon by learning an acceptance-and-scheduling policy that maps states to actions.
+Given an MDP, the goal is to find a policy $\pi$: $S$ $\to$ $A$ that maximizes the expected cumulative reward over the decision horizon. In our case, the objective is to maximize the total revenue over the decision horizon by learning an acceptance-and-scheduling policy that maps states to actions.
 \begin{equation*}
       \pi^* =\arg\max_{\pi} \mathbb{E}_{\pi}\Bigg[\sum_{t=1}^{T_d} \gamma^{t-1} \cdot \mathcal{R}(s_t, a_t)\Bigg]
   \end{equation*}
@@ -150,7 +150,7 @@ In Q-learning, we try to learn the optimal action-value function
 \]
 which should express the expected cumulative reward of taking action $a$ in state $s$ at time point $t$ and then following the optimal policy $\pi^*$ thereafter.
 Once $Q^*$ is known (or
-approximated by a trained network), the optimal policy follows acts greedily with
+approximated by a trained network), the optimal policy acts greedily with
 respect to it:
 \[
   \pi^*(s) = \arg\max_{a \in \mathcal{A}} Q^*(s,a).
@@ -174,8 +174,8 @@ and define the loss function as the mean squared error between the current Q-val
 where $\mathcal{D'}$ is a random sample from the replay buffer that stores the agent's experiences $(s_t, a_t, r_{t+1}, s_{t+1})$.
 \subsubsection{Action Masking}
 Trying to learn the action-value function $Q(s,a)$ with the defined state and action space from above,
-we ran into the problem that the agent often chooses invalid actions. Despite violating an invalid action by a highly negative reward, the agent
-still chooses invalid actions in upcoming decision epochs. This is because the agent does not know which actions are valid and need to learn this from the reward signal too.
+we ran into the problem that the agent often chooses invalid actions. Despite penalizing invalid actions with a highly negative reward, the agent
+still chooses invalid actions in upcoming decision epochs. This is because the agent does not know which actions are valid and needs to learn this from the reward signal too.
 We face this problem by using action masking, which allows us to mask out invalid actions from the action space. Doing so, we use the set of valid actions $\mathcal{A}_s^{\text{valid}}$ defined in the previous section,
 and adapt the Q-function as follows:
 \[
@@ -190,7 +190,7 @@ Note that deciding only on valid actions is rather intuitive, since the decision
 For balancing exploitation and exploration, we use an $\epsilon$-greedy policy during the training phase, which selects a random action with probability $\epsilon$ and the action given by the current Q-function with probability $1-\epsilon$.
 $\epsilon$ is decayed over time, starting with a high value to encourage exploration and gradually decreasing to a lower value to favor exploitation of the learned policy.
 The evaluation of the agent is done with $\epsilon=0$, meaning that the agent always selects the action with highest (approximated) $Q$-value.
-As mentioned above we select an action $a \in \mathcal{A}_s^{\text{valid}}$ randomly in the exploration phase. Hence, each action will be selected 
+As mentioned above, we select an action $a \in \mathcal{A}_s^{\text{valid}}$ randomly in the exploration phase. Hence, each action will be selected 
 with probability $\frac{1}{|\mathcal{A}_s^{\text{valid}}|} = \frac{1}{K-\ell+2}$, where $\ell$ is the length of the current request.
 Note that the probability of rejecting a request (e.g. selecting action $0$) is $\frac{1}{K-\ell+2}$, which is rather small for small requests. This leads to
 a bias towards accepting requests, which is not optimal in the long run, especially when the time horizon $T_d$ is long and the capacities $C_k$ are limited. 
