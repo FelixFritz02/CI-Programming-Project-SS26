@@ -65,7 +65,7 @@ Remark that by this calibration step, features with decreasing monotonicity (e.g
 
 \textbf{Lattice.}
 The resulting values of the calibrated features are combined by a multi-dimensional interpolation rule over a learned grid. 
-In other words, the network does not just learn arbitrary nonlinear dependencies, it learns a monotone function over the input space. 
+In other words, the network does not just learn arbitrary nonlinear dependencies; it learns a monotone function over the input space.
 
 A single lattice with $d$ inputs has $2^d$ learnable corner weights (assuming a grid size of 2 per axis) and is evaluated via $d$-linear interpolation. Figure~\ref{fig:lattice-cube} illustrates this for $d=3$. 
 

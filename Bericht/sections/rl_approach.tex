@@ -24,8 +24,8 @@ The initial state is $s_1 = (1, C_1^{(0)}, \dots, C_K^{(0)}, r_1, q_1)$.
 \textbf{Action space.} $\mathcal{A} = \{0,1,\dots,K\}$: action $a=0$ rejects the current request; action $a \in \{1,\dots,K\}$ accepts it and schedules it starting at slot $a$.
 Assume that the current request has length $\ell \in \{1,\dots,K\}$ and demand vector $q = (q_1,\dots,q_\ell,0,\dots,0)$ (zero-padded to length $K$). Then the action $a$ is feasible if and only if 
 \begin{itemize}
- \item $a+\ell-1 \le K$, we do not exceed the maximum length of resources
- \item $\hat C_{a+i-1} \ge q_i$ for all $i=1,\dots,\ell$, the capacity of all affected slots is sufficient to accept the request.
+ \item $a+\ell-1 \le K$: the block does not extend beyond the last resource $K$
+ \item $\hat C_{a+i-1} \ge q_i$ for all $i=1,\dots,\ell$: the capacity of all affected slots is sufficient to accept the request.
 \end{itemize} 
 Note that for a given state not all actions are feasible: We define the  set of feasible actions $\mathcal{A}_s^{\text{valid}} \subseteq \mathcal{A}$ as the set of actions that do not exceed the remaining capacity of any affected slot and do not exceed the horizon $K$.
 Nevertheless the set of valid actions $\mathcal{A}_s^{\text{valid}}$ is never empty, since $0 \in \mathcal{A}_s^{\text{valid}}$ for all states $s$.
@@ -41,8 +41,8 @@ In case of acceptance, the new capacities are given by the following equation:
 \]
 Note that $\hat{C_k} \geq 0$ for all valid actions $a \in \mathcal{A}_s^{\text{valid}}$ and all $k=1,\dots,K$.
 
-Figure~\ref{fig:state-transition} illustrates the effect of the transition function $\mathcal{T}$ for the capacities on a concrete example with
-$K=5$, request length $\ell=3$, action $a=2$ and applies the update rule.
+Figure~\ref{fig:state-transition} illustrates the effect of applying the transition function $\mathcal{T}$ to the capacities for a concrete example with
+$K=5$, request length $\ell=3$, and action $a=2$.
 
 \begin{figure}[htbp]
   \centering
@@ -194,7 +194,7 @@ As mentioned above, we select an action $a \in \mathcal{A}_s^{\text{valid}}$ ran
 with probability $\frac{1}{|\mathcal{A}_s^{\text{valid}}|} = \frac{1}{K-\ell+2}$, where $\ell$ is the length of the current request.
 Note that the probability of rejecting a request (e.g. selecting action $0$) is $\frac{1}{K-\ell+2}$, which is rather small for small requests. This leads to
 a bias towards accepting requests, which is not optimal in the long run, especially when the time horizon $T_d$ is long and the capacities $C_k$ are limited. 
-We will never have the chance to accept a request, which is deep in the future, if we accept too many requests in the beginning.\\
+We will never have the chance to accept a request that is deep in the future if we accept too many requests at the beginning.\\
 To counteract this bias, we adapt the $\epsilon$-greedy policy to select the reject action with a higher probability than the other actions.
 We define a parameter $\alpha \in [0,1]$ which defines the probability of selecting the reject action in the exploration phase. For $a \in \mathcal{A}_s^{\text{valid}}$, the resulting exploration distribution is given by
 \[

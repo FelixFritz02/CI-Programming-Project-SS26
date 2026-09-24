@@ -6,8 +6,8 @@ to use reinforcement learning techniques to learn acceptance and scheduling poli
 a value-based deep \acs{rl} approach, specifically Q-learning with a deep neural network as function approximator.
 We constructed a stable baseline approach in Section \ref{sec:rl-approach} using a Standard \acs{dqn}. We
 tested the behaviour of the learned $Q$-function with respect to monotonicity relations inherent to the problem.
-Doing so, we constructed a monotonicity test to evaluate the learned $Q$-function (see \ref{subsec:monotonicity-test}).\\
-As a second approach, we took advantage of the known monotonicity relations presented in \ref{subsec:monotonicity} 
+Doing so, we constructed a monotonicity test to evaluate the learned $Q$-function (see Section~\ref{subsec:monotonicity-test}).\\
+As a second approach, we took advantage of the known monotonicity relations presented in Section~\ref{subsec:monotonicity}
 and constructed a monotonicity-aware \acs{dqn}, using lattice layers. We built up a deep lattice
 network architecture that enforces monotonicity by design, and again evaluated its performance 
 and monotonicity behaviour on the same benchmark instances as the Standard \acs{dqn}.\\

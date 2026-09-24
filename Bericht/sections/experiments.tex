@@ -43,7 +43,7 @@ The Standard-DQN baseline is a standard two-layer feedforward network with no st
 of the monotonicity relations from Section~\ref{subsec:monotonicity}. Remember that the layer sizes are adapted to have the same number of parameters as the Lattice-DQN for each instance.
 
 \textbf{Monotonicity behavior.} The standard DQN still manages to learn a policy that is mostly monotone, with only a few violations. Especially
-the monotonicity in $C_k$ and the monotonicity in the mixed pairs are learned very well, and are fulfilled after few training episodes already.
+the monotonicity in $C_k$ and the monotonicity in the mixed pairs are learned very well, and are fulfilled after a few training episodes already.
 Monotonicity in $t$ shows an interesting behavior: first the monotonicity drops to a ratio of $0.3$,
 however during training the monotonicity recovers and gets to a perfect ratio of $1.0$ at the end. This behaviour can
 be seen across different instances. 
@@ -51,7 +51,7 @@ The monotonicity in $q$ and $r$ is learned well from the beginning on and achiev
 An illustrative example of the training phase for the first $10000$ episodes together with the monotonicity behavior is shown in Figure~\ref{fig:standard_dqn_training} for the benchmark instance SB05 with $T_d=50$.
 
 \textbf{Performance.} After $4000$ episodes of training, the agent's performance is already 
-very good and a stable reward niveau is achieved. From this point on, the reward only increases slowly and 
+very good and a stable reward level is achieved. From this point on, the reward only increases slowly and 
 the $50$-episodes moving average fluctuates around the final reward.
 The final evaluation phase shows that the agent achieves a very good performance, which is close to the optimal expected objective value $Z^*$ of the SDP formulation of \textcite{drausp_lion18}.
 Remark that the result in the final evaluation is higher than in the training phase, which is due to the fact that the evaluation is performed with $\epsilon=0$ and therefore no random actions are taken.
@@ -223,7 +223,7 @@ $5$--$12\times$ longer than the parameter-matched Standard-DQN, caused by the pe
 projection and the many small lattice evaluations. Regarding standard deviation, both agents perform comparably.\\
 \subsubsection{Limitations}
 All results are based on a single training run per instance and model. The reported standard deviations only capture the stochasticity of the request sequences during evaluation, not the variability of the training process itself. Repeating the experiments with several random seeds would allow us to assess training stability and to judge whether the observed differences between the Standard-DQN and the Lattice-DQN are statistically significant, especially where the two agents are close in performance.
-A more extensive hyperparameter search could improve the results for both networks, but is out of scope of this work.\\
+A more extensive hyperparameter search could improve the results for both networks, but is outside the scope of this work.\\
 Additionally, it may be possible to track out-of-training performance to stop training early, avoiding
 overfitting and potentially reducing the running time. Stopping with a hard cutoff at a certain number of episodes
 may lead to a suboptimal result, as the training may not have converged yet or the network is in a bad state at the time of stopping.
