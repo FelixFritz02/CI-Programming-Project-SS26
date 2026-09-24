@@ -107,7 +107,7 @@ def evaluate_monotonicity_systematic(agent, env, num_rollouts: int = 5, num_pair
             ))
 
     
-    def _score(pairs, geq=True):
+    def _score(pairs, geq=True, exclude_reject=False):
         if len(pairs) == 0:
             return float("nan")
 
@@ -123,6 +123,11 @@ def evaluate_monotonicity_systematic(agent, env, num_rollouts: int = 5, num_pair
         agent.policy_net.train()
 
         valid_mask = (q_masked_s > -1e8) & (q_masked_s_prime > -1e8)
+        if exclude_reject:
+            # Aktion 0 (Ablehnen) ist unabhängig von r und q der aktuellen
+            # Anfrage - Q(s,0) darf sich hier nicht ändern, sollte also nicht
+            # in die Monotonie-Scores für r und q einfließen.
+            valid_mask[:, 0] = False
         if geq:
             correct = (q_masked_s >= q_masked_s_prime) & valid_mask
         else:
@@ -135,8 +140,8 @@ def evaluate_monotonicity_systematic(agent, env, num_rollouts: int = 5, num_pair
 
     score_c = _score(pairs_c, geq=True)
     score_t = _score(pairs_t, geq=True)  # Richtung anpassen je nach Semantik von t!
-    score_r = _score(pairs_r, geq=False)  # r+1 -> Q sollte nicht kleiner sein als bei r (Richtung ggf. anpassen!)
-    score_q = _score(pairs_q, geq=False)
+    score_r = _score(pairs_r, geq=False, exclude_reject=True)  # r+1 -> Q sollte nicht kleiner sein als bei r (Richtung ggf. anpassen!)
+    score_q = _score(pairs_q, geq=False, exclude_reject=True)
     score_mixed = _score(pairs_mixed, geq=False)
 
     return score_c, score_t, score_r, score_q, score_mixed

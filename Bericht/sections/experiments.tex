@@ -15,7 +15,8 @@ training-scheme parameters: reject-bias $\alpha=0.75$, $\gamma = 0.99$, $\epsilo
 $1.0$ to $0.05$ over $T_d \cdot 1{.}000$ steps ($10{.}000$ for $T_d=10$, $20{.}000$ for $T_d=20$
 and $50{.}000$ for $T_d=50$), a replay buffer of $50{.}000$ transitions with a $500$-step warm-up,
 batch size $64$ and one training step every $T_d/2.5$ environment steps, since episode length scales
-with $T_d$ and this keeps the number of training updates per episode comparable across instances.
+with $T_d$ and this keeps the number of training updates per episode comparable across instances.\\
+Note that $\gamma = 1$ would be mathematically correct for the finite-horizon \acs{mdp} formulation of the \acs{drausp}, but we found that $\gamma = 0.99$ leads to better convergence in practice.
 
 \textbf{Monotonicity test.} We evaluate the agents' monotonicity behavior every $100$ training
 episodes by sampling $5$ trajectories, creating pairs of states as described in
@@ -46,7 +47,7 @@ the monotonicity in $C_k$ and the monotonicity in the mixed pairs is learned ver
 Monotonicity in $t$ shows an interesting behavior: first the monotonicity drops to a ratio of $0.2$,
 however during training the monotonicity recovers and gets to a perfect ratio of $1.0$ at the end. This behaviour can
 be seen across different instances. 
-The monotonicity in $q$ and $r$ is learned well from the beginning on and achieves a ratio $>0.8$ in the end. \\
+The monotonicity in $q$ and $r$ is learned well from the beginning on and achieves a nearly perfect ratio of $1.0$ at the end. \\
 An illustrative example of the training phase for the first $10000$ episodes together with the monotonicity behavior is shown in Figure~\ref{fig:standard_dqn_training} for the benchmark instance SB05 with $T_d=50$.
 
 \textbf{Performance.} After $4000$ episodes of training, the agent's performance is already 
@@ -57,7 +58,7 @@ Remark that the result in the final evaluation is higher than in the training ph
 \begin{figure}[ht]
 	\centering
 	\hspace*{-1.8cm}
-	\includegraphics[scale=0.5]{grafiken/Experiments/standard_DQN_mono_SB5_all.png}
+	\includegraphics[scale=0.5]{grafiken/Experiments/standard_DQN_mono_SB5_all_new.png}
 	\caption[Standard-DQN training and monotonicity behavior (SB05, $T_d=50$)]{Standard-DQN: training performance and monotonicity behavior on SB05, $T_d = 50$, over $10\,000$ training episodes.}
 	\label{fig:standard_dqn_training}
 \end{figure}

@@ -217,13 +217,13 @@ zu Beginn von Epoche $t$ lässt sich als
 \end{equation}
 darstellen, wobei $t$ die verstrichene Zeit, $\hat C_k$ die verbleibende Restkapazität von Slot
 $k$, $r$ die Belohnung der in Epoche $t$ eintreffenden Anfrage und $q_k$ deren Bedarfsvektor
-bezeichnet (\texttt{gymnasium\_env.py}, Klasse \texttt{DrauspEnv}).
+bezeichnet.
 
 \textbf{Anfragen haben variable Länge, der Zustand nicht.} Eine Anfrage belegt bei Annahme keinen
 einzelnen Slot, sondern einen \emph{zusammenhängenden Block} von $\ell \in \{1,\dots,K\}$ Slots,
 und benötigt dabei für den $i$-ten Slot dieses Blocks $q_i$ Kapazitätseinheiten,
 $i = 1,\dots,\ell$. Die Blocklänge $\ell$ variiert von Anfrage zu Anfrage -- im
-Instanzgenerator (\texttt{instance\_generator.py}) wird sie gleichverteilt aus
+Instanzgenerator wird sie gleichverteilt aus
 $\{1,\dots,K\}$ gezogen; in Benchmark-Instanzen kann sie auch fix vorgegeben sein
 (\texttt{fixed\_request\_length}). Da aber \emph{ein und dasselbe} Netzwerk Zustände zu jeder
 Anfrage verarbeiten muss, wird der Bedarfsvektor unabhängig von $\ell$ stets auf die feste Länge
