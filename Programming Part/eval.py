@@ -73,9 +73,9 @@ from models.deep_lattice import DeepLatticeNetwork
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INSTANCES_DIR = PROJECT_ROOT / "instances"
 DEFAULT_TD_MAPPING = Path(__file__).resolve().parent / "td_mapping.csv"
-DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results_deep_lattice_dynamic_update.csv"
+DEFAULT_OUT_CSV = Path(__file__).resolve().parent / "eval_results_standard_dqn_monoton_update.csv"
 
-MODEL_CHOICES = ["deep_lattice"]
+MODEL_CHOICES = ["standard_dqn"]
 
 
 # =========================================================================
@@ -87,7 +87,7 @@ MODEL_CHOICES = ["deep_lattice"]
 # "python eval.py run --model ...") greift stattdessen die CLI (siehe unten
 # in main()), diese Werte werden dann ignoriert.
 # =========================================================================
-MODEL = "deep_lattice"          # einer aus MODEL_CHOICES
+MODEL = "standard_dqn"          # einer aus MODEL_CHOICES
 TRAIN_EPISODES = 20_000
 EVAL_EPISODES = 10_000
 
@@ -97,7 +97,7 @@ SUBSETS = None                 # z.B. ["lion18s"], None = alle Unterordner (lion
 # SB05 & WC03 (T_d=50, durch längeres 20k-Training am stärksten destabilisiert),
 # WA06 (T_d=50, ebenfalls destabilisiert), SA12 & WA03 (T_d=50, hatten
 # umgekehrt von 20k profitiert -> prüfen, ob die Regel das nicht verschlechtert).
-ONLY = ["SA01", "SC01", "SB05", "WC03", "WA06", "SA12", "WA03"]
+ONLY = None
 LIMIT = None                    # z.B. 3, um erst mal nur wenige Instanzen zum Testen zu laufen
 
 DEFAULT_T_D = None              # Fallback-T_d für Instanzen ohne Eintrag in td_mapping.csv (z.B. wendtris)
@@ -113,7 +113,7 @@ MODEL_KWARGS = {}               # Modell-kwargs, z.B. {"keypoints": 10} (nur fü
 # Nur wirksam wenn MODEL == "standard_dqn". Wird pro Instanz automatisch die
 # Parameterzahl von MATCH_PARAMS_TO berechnet und dazu passende hidden_dims gesucht
 # (überschreibt ein evtl. in MODEL_KWARGS gesetztes "hidden_dims"). None = aus.
-MATCH_PARAMS_TO = None         # z.B. "deep_lattice"
+MATCH_PARAMS_TO = "deep_lattice"         # z.B. "deep_lattice"
 MATCH_PARAMS_TO_KWARGS = {}     # kwargs für das Zielmodell, z.B. {"keypoints": 8, "lattice_units": 4}
 MATCH_DEPTH = 2                 # Anzahl Hidden-Layer für die standard_dqn-Suche
 MATCH_REQUIRE_FUNNEL = True     # h1 >= h2 >= ... erzwingen (wie bisherige (32,16)-Architektur)
