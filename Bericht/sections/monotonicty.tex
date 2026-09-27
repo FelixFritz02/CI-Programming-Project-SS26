@@ -195,8 +195,7 @@ group $B$, and $k_C=(i+2)\bmod K$ in group $C$, so sweeping $i$ over all $K$ res
 exactly $K$ triplets instead of enumerating all $K^3$ possible $(k_A,k_B,k_C)$ combinations.
 
 \textbf{Output layer.} A \texttt{Linear} output layer aggregates all Layer-2 outputs into one $Q$-value
-per action. Its weights are clamped to $\geq 0$ after every optimization step
-(\texttt{apply\_constraints()}), so that a positive (monotonic) effect from the preceding layers
+per action. Its weights are clamped to $\geq 0$ after every optimization step, so that a positive (monotonic) effect from the preceding layers
 cannot be reversed by negative weights in this final step. This makes $Q(s,a)$ monotonic in $t$, $C_k$, $r$, and $q_k$ -- enforced by the architecture.
 
 Figure~\ref{fig:deep-lattice-architecture} sketches this construction for $K=2$ resources.
