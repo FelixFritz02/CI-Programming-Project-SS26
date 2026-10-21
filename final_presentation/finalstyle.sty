@@ -153,7 +153,7 @@
       box/.default=gray!10, >={Latex[length=2mm]}]
     \node[box=gray!10]   (in)  {\textbf{State}\\[2pt] $t,\ C_k,\ r,\ q_k$};
     \node[box=blue!8,   right=of in]  (cal) {\textbf{Calibrators}\\[2pt] monotone map\\ to $[0,1]$;\\ flip $t$ and $q_k$};
-    \node[box=red!12,   right=of cal] (l1)  {\textbf{Lattices}\\ \textbf{per resource}\\[2pt] small $2{\times}2{\times}2$\\ look-up cubes};
+    \node[box=red!12,   right=of cal] (l1)  {\textbf{Lattices}\\ \textbf{per resource}\\[2pt] $2{\times}2{\times}2$\\ lattice cubes per resource $k$};
     \node[box=violet!14,right=of l1]  (l2)  {\textbf{Lattices}\\ \textbf{across resources}\\[2pt] couple different\\ resources};
     \node[box=yellow!25,right=of l2]  (out) {\textbf{Output}\\[2pt] linear layer,\\ weights $\geq 0$\\[2pt] $\Rightarrow Q(s,a)$};
     \foreach \a/\b in {in/cal, cal/l1, l1/l2, l2/out}{\draw[->, thick] (\a) -- (\b);}

@@ -246,7 +246,7 @@
     \column{0.5\textwidth}
       \begin{block}{Fair comparison}
         \small The Standard-DQN gets the \emph{same number of parameters}
-        as the Lattice-DQN on every instance.
+        as the Lattice-DQN in a two Layer framework on every instance.
       \end{block}
   \end{columns}
 \end{frame}
@@ -271,7 +271,7 @@
       \begin{block}{Protocol}
         \begin{itemize}
           \item Same training scheme for both agents
-          \item $10\,000$ training episodes
+          \item \color{red}{$10\,000$} training episodes
           \item Evaluation: frozen weights, no exploration, $10\,000$ episodes
           \item Monotonicity test: $10\,000$ pairs per component
         \end{itemize}
@@ -352,7 +352,7 @@
     \item \textbf{Sample efficiency:} both agents reach a stable level after about $4\,000$ episodes;
       the Lattice-DQN is slightly more unstable at the start.
     \item \textbf{Training time:} the Lattice-DQN trains $5$--$12\times$ slower
-      (constraint enforcement after every step, many small lattice evaluations).
+      \textcolor{red}{(monotonicity enforcement after every step , many small lattice evaluations)}.
     \item \textbf{Tuning:} the Lattice-DQN needs considerably more hyperparameter fine-tuning;
       the Standard-DQN is robust.
   \end{itemize}
@@ -389,6 +389,7 @@
           \item Standard deviations reflect only the random requests, not training variability
           \item Several seeds needed to judge significance
           \item No extensive hyperparameter search
+          \item No strict seperation of training and evaluation indatastances
         \end{itemize}
       \end{block}
     \column{0.5\textwidth}
