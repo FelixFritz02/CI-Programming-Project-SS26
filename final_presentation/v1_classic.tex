@@ -255,6 +255,137 @@
 \section{Experiments}
 %==============================================================================
 
+\begin{frame}{Deep Lattice architecture in detail}
+  \centering
+  \resizebox{!}{0.78\textheight}{%
+  \begin{tikzpicture}[
+      font=\small,
+      every node/.style={align=center},
+      inp/.style ={draw, circle, minimum size=7mm, fill=gray!10},
+      cal/.style ={draw, rounded corners, minimum width=13mm, minimum height=8mm, fill=blue!8},
+      latA/.style={draw, rounded corners, minimum width=17mm, minimum height=11mm, fill=red!15},
+      latB/.style={draw, rounded corners, minimum width=17mm, minimum height=11mm, fill=green!18},
+      latC/.style={draw, rounded corners, minimum width=17mm, minimum height=11mm, fill=orange!20},
+      avg/.style ={draw, circle, minimum size=6mm, fill=cyan!15},
+      cb/.style ={draw, rounded corners, minimum width=48mm, minimum height=9mm, fill=blue!8},
+      l2/.style ={draw, rounded corners, minimum width=22mm, minimum height=11mm, fill=violet!18},
+      outl/.style={draw, rounded corners, minimum width=34mm, minimum height=8mm, fill=gray!20},
+      qn/.style ={draw, circle, minimum size=9mm, fill=yellow!25},
+      >={Latex[length=2mm]}
+    ]
+
+    % ---------- Layer 0: raw features ----------
+    \node[inp] (t)  at (2.2,0)  {$t$};
+    \node[inp] (c1) at (3.6,0)  {$C_1$};
+    \node[inp] (c2) at (5.0,0)  {$C_2$};
+    \node[inp] (r)  at (6.4,0)  {$r$};
+    \node[inp] (q1) at (7.8,0)  {$q_1$};
+    \node[inp] (q2) at (9.2,0)  {$q_2$};
+
+    % ---------- Layer 0: calibrators ----------
+    \node[cal] (calt)  at (2.2,-1.9) {cal$_t$\\\tiny DEC};
+    \node[cal] (calc1) at (3.6,-1.9) {cal$_{C_1}$\\\tiny INC};
+    \node[cal] (calc2) at (5.0,-1.9) {cal$_{C_2}$\\\tiny INC};
+    \node[cal] (calr)  at (6.4,-1.9) {cal$_r$\\\tiny INC};
+    \node[cal] (calq1) at (7.8,-1.9) {cal$_{q_1}$\\\tiny DEC};
+    \node[cal] (calq2) at (9.2,-1.9) {cal$_{q_2}$\\\tiny DEC};
+
+    \foreach \a/\b in {t/calt, c1/calc1, c2/calc2, r/calr, q1/calq1, q2/calq2}
+      \draw[->] (\a) -- (\b);
+
+    % ---------- Layer 1: lattice groups per resource k ----------
+    \node[latA, fill=red!8,     draw=black!35] at ($(0.7,-4.3)+(0.16,0.24)$) {};
+    \node[latA, fill=red!11,    draw=black!45] at ($(0.7,-4.3)+(0.08,0.12)$) {};
+    \node[latA] (a1) at (0.7,-4.3) {$A_1$\\\tiny$[t,r,C_1]$};
+
+    \node[latB, fill=green!10,  draw=black!35] at ($(2.7,-4.3)+(0.16,0.24)$) {};
+    \node[latB, fill=green!14,  draw=black!45] at ($(2.7,-4.3)+(0.08,0.12)$) {};
+    \node[latB] (b1) at (2.7,-4.3) {$B_1$\\\tiny$[C_1,q_1,r]$};
+
+    \node[latC, fill=orange!13, draw=black!35] at ($(4.7,-4.3)+(0.16,0.24)$) {};
+    \node[latC, fill=orange!16, draw=black!45] at ($(4.7,-4.3)+(0.08,0.12)$) {};
+    \node[latC] (g1) at (4.7,-4.3) {$C_1$\\\tiny$[t,C_1,q_1]$};
+
+    \node[latA, fill=red!8,     draw=black!35] at ($(6.7,-4.3)+(0.16,0.24)$) {};
+    \node[latA, fill=red!11,    draw=black!45] at ($(6.7,-4.3)+(0.08,0.12)$) {};
+    \node[latA] (a2) at (6.7,-4.3) {$A_2$\\\tiny$[t,r,C_2]$};
+
+    \node[latB, fill=green!10,  draw=black!35] at ($(8.7,-4.3)+(0.16,0.24)$) {};
+    \node[latB, fill=green!14,  draw=black!45] at ($(8.7,-4.3)+(0.08,0.12)$) {};
+    \node[latB] (b2) at (8.7,-4.3) {$B_2$\\\tiny$[C_2,q_2,r]$};
+
+    \node[latC, fill=orange!13, draw=black!35] at ($(10.7,-4.3)+(0.16,0.24)$) {};
+    \node[latC, fill=orange!16, draw=black!45] at ($(10.7,-4.3)+(0.08,0.12)$) {};
+    \node[latC] (g2) at (10.7,-4.3) {$C_2$\\\tiny$[t,C_2,q_2]$};
+
+    \draw[->] (calt) -- (a1); \draw[->] (calr)  -- (a1); \draw[->] (calc1) -- (a1);
+    \draw[->] (calc1)-- (b1); \draw[->] (calq1) -- (b1); \draw[->] (calr)  -- (b1);
+    \draw[->] (calt) -- (g1); \draw[->] (calc1) -- (g1); \draw[->] (calq1) -- (g1);
+
+    \draw[->] (calt) -- (a2); \draw[->] (calr)  -- (a2); \draw[->] (calc2) -- (a2);
+    \draw[->] (calc2)-- (b2); \draw[->] (calq2) -- (b2); \draw[->] (calr)  -- (b2);
+    \draw[->] (calt) -- (g2); \draw[->] (calc2) -- (g2); \draw[->] (calq2) -- (g2);
+
+    % ---------- ensemble averaging: mean over lattice_units per group/resource ----------
+    \node[avg] (avga1) at (0.7,-5.5) {\tiny avg};
+    \node[avg] (avgb1) at (2.7,-5.5) {\tiny avg};
+    \node[avg] (avgg1) at (4.7,-5.5) {\tiny avg};
+    \node[avg] (avga2) at (6.7,-5.5) {\tiny avg};
+    \node[avg] (avgb2) at (8.7,-5.5) {\tiny avg};
+    \node[avg] (avgg2) at (10.7,-5.5) {\tiny avg};
+
+    \foreach \a/\b in {a1/avga1, b1/avgb1, g1/avgg1, a2/avga2, b2/avgb2, g2/avgg2}
+      \draw[->] (\a) -- (\b);
+
+    \node[align=left] at (12.55,-5.5) {\scriptsize mean over\\\scriptsize \texttt{lattice\_units}};
+
+    % ---------- intermediate calibrators ----------
+    \node[cb] (cb) at (5.7,-7.1) {Intermediate calibrators ($3K$ total, each INC)};
+    \foreach \n in {avga1,avgb1,avgg1,avga2,avgb2,avgg2}
+      \draw[->] (\n) -- (cb);
+
+    % ---------- Layer 2: cross-resource lattices ----------
+    \node[l2, fill=violet!10, draw=black!35] at ($(3.1,-9.3)+(0.24,0.36)$) {};
+    \node[l2, fill=violet!13, draw=black!45] at ($(3.1,-9.3)+(0.12,0.18)$) {};
+    \node[l2] (l2a) at (3.1,-9.3) {$L2_1$\\\tiny$(A_1,B_2,C_1)$};
+
+    \node[l2, fill=violet!10, draw=black!35] at ($(5.7,-9.3)+(0.24,0.36)$) {};
+    \node[l2, fill=violet!13, draw=black!45] at ($(5.7,-9.3)+(0.12,0.18)$) {};
+    \node[l2] (l2b) at (5.7,-9.3) {$L2_2$\\\tiny$(A_2,B_1,C_2)$};
+
+    \node[l2, fill=violet!10, draw=black!35] at ($(8.3,-9.3)+(0.24,0.36)$) {};
+    \node[l2, fill=violet!13, draw=black!45] at ($(8.3,-9.3)+(0.12,0.18)$) {};
+    \node[l2] (l2c) at (8.3,-9.3) {$\cdots$\\\tiny further triplets};
+
+    \draw[->] (cb) -- (l2a);
+    \draw[->] (cb) -- (l2b);
+    \draw[->] (cb) -- (l2c);
+
+    % ---------- output layer ----------
+    \node[outl] (out) at (5.7,-11.3) {Linear, weights $\geq 0$};
+    \draw[->] (l2a) -- (out);
+    \draw[->] (l2b) -- (out);
+    \draw[->] (l2c) -- (out);
+
+    % ---------- Q-values ----------
+    \node[qn] (q0) at (4.45,-13.1) {$Q(s,a_0)$};
+    \node[qn] (q1o) at (6.95,-13.1) {$Q(s,a_1)$};
+    \draw[->] (out) -- (q0);
+    \draw[->] (out) -- (q1o);
+
+    % ---------- layer labels ----------
+    \node[anchor=east, gray] at (-0.9,0)    {\scriptsize Input};
+    \node[anchor=east, gray] at (-0.9,-1.9) {\scriptsize Layer 0};
+    \node[anchor=east, gray] at (-0.9,-4.3) {\scriptsize Layer 1};
+    \node[anchor=east, gray] at (-0.9,-5.5) {\scriptsize Ensemble avg};
+    \node[anchor=east, gray] at (-0.9,-7.1) {\scriptsize Layer 1$\to$2};
+    \node[anchor=east, gray] at (-0.9,-9.3) {\scriptsize Layer 2};
+    \node[anchor=east, gray] at (-0.9,-11.3) {\scriptsize Output};
+
+  \end{tikzpicture}}\\[4pt]
+  {\scriptsize Sketch of the Deep Lattice network for $K=2$ resources (report, Fig.~3.2).}
+\end{frame}
+
 \begin{frame}{Experimental setup}
   \begin{columns}[T]
     \column{0.5\textwidth}
