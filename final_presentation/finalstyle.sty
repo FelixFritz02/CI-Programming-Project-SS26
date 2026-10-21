@@ -1,0 +1,300 @@
+%==============================================================================
+%  finalstyle.sty -- shared look & shared graphics for all three versions of the
+%  final presentation. Visual style taken 1:1 from ../presentation/main.tex
+%  (Madrid theme, RPTU green, slim footline).
+%
+%  All numbers in the charts below come from the report (../Bericht), Tables 2+3.
+%  Derived values (means per horizon, minima per axis) were computed from those
+%  tables; nothing else is used.
+%==============================================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{finalstyle}[2026/10/20 Final presentation style]
+
+\usetheme{Madrid}
+\usecolortheme{default}
+
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage[english]{babel}
+\RequirePackage{amsmath, amssymb, mathtools}
+\RequirePackage{booktabs}
+\RequirePackage{xcolor}
+\RequirePackage{tikz}
+\RequirePackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usetikzlibrary{arrows.meta, positioning, calc, decorations.pathreplacing, fit, backgrounds, shapes.misc}
+
+%------------------------------------------------------------------------------
+%  Colours (identical to the first presentation)
+%------------------------------------------------------------------------------
+\definecolor{tugreen}{RGB}{0, 110, 80}
+\definecolor{alertred}{RGB}{180, 0, 0}
+\definecolor{extramethod}{RGB}{180, 80, 0}
+
+% Agent colours: blue = Standard-DQN, orange = Lattice-DQN, as in the report
+% figures. Pair checked for colour-vision deficiency (OKLab dE: normal 27.0,
+% protan 22.2, deutan 23.6) and contrast on white (4.8:1 and 5.1:1).
+\definecolor{stdcol}{HTML}{1F77B4}
+\colorlet{latcol}{extramethod}
+\definecolor{inkmuted}{RGB}{90, 90, 90}
+
+\setbeamercolor{structure}{fg=tugreen}
+\setbeamercolor{frametitle}{bg=tugreen, fg=white}
+\setbeamercolor{title}{bg=tugreen, fg=white}
+\setbeamercolor{title separator}{fg=tugreen}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{frametitle continuation}{}
+\setbeamertemplate{caption}[numbered]
+\setbeamerfont{caption}{size=\scriptsize}
+
+% slim footline (as in the first presentation)
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,left]{author in head/foot}%
+      \hspace*{1.5ex}\insertshortauthor%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,right]{title in head/foot}%
+      \insertshorttitle\hspace*{2ex}\insertframenumber\,/\,\inserttotalframenumber\hspace*{1.5ex}%
+    \end{beamercolorbox}%
+  }\vskip0pt%
+}
+
+% Gap between columns: every \column{w} is set \colgap narrower than requested.
+% Beamer spreads the freed space evenly before, between and after the columns,
+% so blocks standing side by side no longer touch each other or the slide edge.
+% (Copy of beamer's \beamer@columncom with only the minipage width changed.)
+\newlength{\colgap}
+\setlength{\colgap}{4mm}
+\renewcommand<>\beamer@columncom[2][\beamer@colmode]{%
+  \beamer@colclose%
+  \def\beamer@colclose{\end{minipage}\hfill\end{actionenv}\ignorespaces}%
+  \begin{actionenv}#3%
+  \setkeys{beamer@col}{#1}%
+  \ifbeamer@colheight
+    \begin{minipage}[\beamer@colalign][\beamer@colheight]{\dimexpr#2-\colgap\relax}%
+  \else
+    \begin{minipage}[\beamer@colalign]{\dimexpr#2-\colgap\relax}%
+  \fi
+  \leavevmode\raggedright\beamer@colheadskip\ignorespaces}
+
+%------------------------------------------------------------------------------
+%  Bibliography
+%------------------------------------------------------------------------------
+\RequirePackage{csquotes}
+\RequirePackage[backend=biber, style=numeric, sorting=none, maxbibnames=2, maxcitenames=1, giveninits=true]{biblatex}
+\addbibresource{mybib.bib}
+
+%------------------------------------------------------------------------------
+%  Abbreviations
+%------------------------------------------------------------------------------
+\newcommand{\drausp}{DRAUSP}% upright caps: the sans font has no small caps
+\newcommand{\Chat}{\hat{C}}
+\newcommand{\Std}{\textcolor{stdcol}{\textbf{Standard-DQN}}}
+\newcommand{\Lat}{\textcolor{latcol}{\textbf{Lattice-DQN}}}
+
+%------------------------------------------------------------------------------
+%  Common title data
+%------------------------------------------------------------------------------
+\title[Monotonicity in the Q-Function for \drausp]{Exploiting Monotonicity in the Q-Function\\for \drausp{} via Reinforcement Learning}
+\author[F.\ Fritz, N.\ Fritz]{Felix Fritz \and Niklas Fritz}
+\institute[RPTU]{RPTU Kaiserslautern-Landau\\[2pt]
+  {\footnotesize Business Information Systems \& Operations Research\\ Supervisor: Konstantin Kloster, M.\,Sc.}}
+\date{October 28, 2026}
+
+%------------------------------------------------------------------------------
+%  Small layout helpers
+%------------------------------------------------------------------------------
+% big key number with a caption underneath
+\newcommand{\KeyNumber}[3][tugreen]{%
+  \begin{center}
+    {\fontsize{26}{28}\selectfont\bfseries\color{#1}#2}\\[0.5em]
+    \parbox{0.92\linewidth}{\centering\small #3}
+  \end{center}}
+
+% source line under charts
+\newcommand{\Source}[1]{{\par\vspace{2pt}\color{inkmuted}\tiny #1\par}}
+
+%------------------------------------------------------------------------------
+%  Graphic 1: the DRAUSP decision (adapted from the report, Fig. 1)
+%------------------------------------------------------------------------------
+\newcommand{\ProblemGraphic}{%
+  \begin{tikzpicture}[font=\scriptsize,
+      slot/.style={draw, minimum width=10mm, minimum height=8mm},
+      occ/.style ={draw, fill=orange!25, minimum width=10mm, minimum height=8mm},
+      >={Latex[length=2mm]}]
+    % incoming request
+    \node[draw, rounded corners, fill=tugreen!10, align=center, minimum width=34mm] (req) at (2.2,1.95)
+      {\textbf{incoming request} $(r, q)$\\ reward $r$, demand $q=(q_1,q_2,q_3)$};
+    % before
+    \node[anchor=east] at (-0.6,0.6) {before:};
+    \foreach \k/\x in {1/0,2/1.1,3/2.2,4/3.3,5/4.4}{
+      \node[slot] (b\k) at (\x,0.6) {$\Chat_\k$};}
+    \draw[decorate, decoration={brace, amplitude=4pt}] (0.65,1.08) -- (3.85,1.08)
+      node[midway, above=4pt, fill=white, inner sep=1pt] {accept at start slot $a=2$};
+    % after
+    \node[anchor=east] at (-0.6,-0.9) {after:};
+    \node[slot] (a1) at (0,-0.9) {$\Chat_1$};
+    \node[occ]  (a2) at (1.1,-0.9) {$\Chat_2{-}q_1$};
+    \node[occ]  (a3) at (2.2,-0.9) {$\Chat_3{-}q_2$};
+    \node[occ]  (a4) at (3.3,-0.9) {$\Chat_4{-}q_3$};
+    \node[slot] (a5) at (4.4,-0.9) {$\Chat_5$};
+    \foreach \k in {1,5}{\draw[->, dashed, gray] (b\k) -- (a\k);}
+    \foreach \k in {2,3,4}{\draw[->] (b\k) -- (a\k);}
+    \node[below=1pt, gray] at (a3.south) {\tiny $K=5$ slots, remaining capacity $\Chat_k$};
+  \end{tikzpicture}}
+
+%------------------------------------------------------------------------------
+%  Graphic 2: Lattice-DQN pipeline (simplified from the report, Fig. 3)
+%------------------------------------------------------------------------------
+\newcommand{\LatticePipeline}{%
+  \begin{tikzpicture}[font=\scriptsize, node distance=3.5mm,
+      box/.style={draw, rounded corners, align=center, minimum height=17mm, text width=22.5mm, fill=##1},
+      box/.default=gray!10, >={Latex[length=2mm]}]
+    \node[box=gray!10]   (in)  {\textbf{State}\\[2pt] $t,\ C_k,\ r,\ q_k$};
+    \node[box=blue!8,   right=of in]  (cal) {\textbf{Calibrators}\\[2pt] monotone map\\ to $[0,1]$;\\ flip $t$ and $q_k$};
+    \node[box=red!12,   right=of cal] (l1)  {\textbf{Lattices}\\ \textbf{per resource}\\[2pt] small $2{\times}2{\times}2$\\ look-up cubes};
+    \node[box=violet!14,right=of l1]  (l2)  {\textbf{Lattices}\\ \textbf{across resources}\\[2pt] couple different\\ resources};
+    \node[box=yellow!25,right=of l2]  (out) {\textbf{Output}\\[2pt] linear layer,\\ weights $\geq 0$\\[2pt] $\Rightarrow Q(s,a)$};
+    \foreach \a/\b in {in/cal, cal/l1, l1/l2, l2/out}{\draw[->, thick] (\a) -- (\b);}
+    \draw[decorate, decoration={brace, mirror, amplitude=5pt}, tugreen, thick]
+      ($(cal.south west)+(0,-0.12)$) -- ($(out.south east)+(0,-0.12)$)
+      node[midway, below=6pt, text=black] {every stage is monotone $\Rightarrow$ the whole network is monotone, \textbf{by construction}};
+  \end{tikzpicture}}
+
+%------------------------------------------------------------------------------
+%  Chart 1: mean reward in % of the optimum Z*, per decision horizon T_d
+%  (means over all instances with that T_d, report Tables 2+3)
+%------------------------------------------------------------------------------
+\newcommand{\ShareOfOptimumChart}[2]{% #1 width, #2 height
+  \begin{tikzpicture}
+    \begin{axis}[
+        width=#1, height=#2,
+        symbolic x coords={5,10,20,50}, xtick=data,
+        xticklabels={{$T_d{=}5$\\[-1pt]\tiny 3 inst.},{$T_d{=}10$\\[-1pt]\tiny 18 inst.},{$T_d{=}20$\\[-1pt]\tiny 18 inst.},{$T_d{=}50$\\[-1pt]\tiny 11 inst.}},
+        xticklabel style={align=center, font=\scriptsize},
+        enlarge x limits=0.14,
+        ymin=80, ymax=101, ytick={80,85,90,95,100},
+        yticklabel={\pgfmathprintnumber{\tick}\,\%},
+        yticklabel style={font=\scriptsize},
+        ylabel={mean reward in \% of $Z^*$}, ylabel style={font=\scriptsize},
+        axis x line*=bottom, axis y line*=left,
+        ymajorgrids, grid style={gray!20, solid},
+        axis line style={gray!60}, tick style={gray!60},
+        legend style={at={(0.02,0.04)}, anchor=south west, draw=none, fill=white, fill opacity=0.85, text opacity=1, font=\scriptsize, legend columns=1},
+        legend cell align=left,
+        clip=false,
+      ]
+      \addplot[stdcol, line width=1.2pt, mark=*, mark size=2.6pt, mark options={draw=white, line width=0.6pt}]
+        coordinates {(5,96.89) (10,98.35) (20,96.35) (50,94.21)};
+      \addlegendentry{Standard-DQN}
+      \addplot[latcol, line width=1.2pt, mark=square*, mark size=2.4pt, mark options={draw=white, line width=0.6pt}]
+        coordinates {(5,97.92) (10,97.42) (20,93.55) (50,86.24)};
+      \addlegendentry{Lattice-DQN}
+      \node[anchor=west, font=\scriptsize] at (axis cs:50,94.21) {\ 94.2\,\%};
+      \node[anchor=west, font=\scriptsize] at (axis cs:50,86.24) {\ 86.2\,\%};
+    \end{axis}
+  \end{tikzpicture}}
+
+%------------------------------------------------------------------------------
+%  Chart 2: lowest final monotonicity score of the Standard-DQN per axis over
+%  all 50 instances (report Tables 2+3); Lattice-DQN = 1.00 everywhere.
+%------------------------------------------------------------------------------
+\newcommand{\MonotonicityChart}[2]{% #1 width, #2 height
+  \begin{tikzpicture}
+    \begin{axis}[
+        width=#1, height=#2,
+        xbar, bar width=7pt,
+        xmin=0, xmax=1.0,
+        xtick={0,0.25,0.5,0.75,1}, xticklabel style={font=\scriptsize, /pgf/number format/fixed, /pgf/number format/precision=2},
+        symbolic y coords={mixed,q_k,r,t,C_k}, ytick={mixed,q_k,r,t,C_k},
+        yticklabels={mixed,$q_k$,$r$,$t$,$C_k$},
+        yticklabel style={font=\scriptsize},
+        enlarge y limits=0.16,
+        axis x line*=bottom, axis y line*=left,
+        xmajorgrids, grid style={gray!20, solid},
+        axis line style={gray!60}, tick style={gray!60},
+        xlabel={lowest score over all 50 instances}, xlabel style={font=\scriptsize},
+        clip=false,
+      ]
+      \addplot[fill=stdcol, draw=none] coordinates {(0.94,C_k) (0.69,t) (0.99,r) (0.71,q_k) (0.97,mixed)};
+      % Lattice-DQN reference: 1.00 everywhere, by construction
+      \draw[latcol, line width=1.6pt] (axis cs:1,{[normalized]-0.55}) -- (axis cs:1,{[normalized]4.55});
+      \node[anchor=south, font=\scriptsize, align=center] at (axis cs:1,{[normalized]4.55}) {Lattice-DQN: 1.00};
+      % value column: Standard-DQN minimum and the instance where it occurs
+      \node[anchor=west, font=\scriptsize] at (axis cs:1.03,C_k)   {0.94 (WC02)};
+      \node[anchor=west, font=\scriptsize] at (axis cs:1.03,t)     {0.69 (SB08)};
+      \node[anchor=west, font=\scriptsize] at (axis cs:1.03,r)     {0.99 (SB07)};
+      \node[anchor=west, font=\scriptsize] at (axis cs:1.03,q_k)   {0.71 (SC01)};
+      \node[anchor=west, font=\scriptsize] at (axis cs:1.03,mixed) {0.97 (WC04)};
+    \end{axis}
+  \end{tikzpicture}}
+
+%------------------------------------------------------------------------------
+%  Chart 3 (version 1): mean AND lowest final monotonicity score of the
+%  Standard-DQN per component over all 50 instances (report Tables 2+3);
+%  Lattice-DQN = 1.00 everywhere. Means rounded to two decimals like the
+%  report (C_k 0.9914, t 0.9736, r 0.9998, q_k 0.9800, mixed 0.9994).
+%  Light blue = lighter step of the Standard-DQN blue (ordinal pair:
+%  dL 0.22, contrast 2.0:1 on white, every bar carries a value label).
+%------------------------------------------------------------------------------
+\definecolor{stdlight}{HTML}{8DBBDD}
+\newcommand{\MonotonicityMeanMinChart}[2]{% #1 width, #2 height
+  \begin{tikzpicture}
+    \begin{axis}[
+        width=#1, height=#2,
+        xbar, bar width=6pt,
+        xmin=0, xmax=1.0,
+        xtick={0,0.25,0.5,0.75,1}, xticklabel style={font=\scriptsize, /pgf/number format/fixed, /pgf/number format/precision=2},
+        symbolic y coords={mixed,q_k,r,t,C_k}, ytick={mixed,q_k,r,t,C_k},
+        yticklabels={mixed,$q_k$,$r$,$t$,$C_k$},
+        yticklabel style={font=\small},
+        enlarge y limits=0.13,
+        axis x line*=bottom, axis y line*=left,
+        xmajorgrids, grid style={gray!20, solid},
+        axis line style={gray!60}, tick style={gray!60},
+        xlabel={monotonicity score}, xlabel style={font=\scriptsize},
+        legend style={at={(0,1.02)}, anchor=south west, draw=none, font=\scriptsize, legend columns=2,
+          /tikz/every even column/.append style={column sep=10pt}},
+        legend image code/.code={\fill[##1] (0cm,-0.09cm) rectangle (0.35cm,0.09cm);},
+        clip=false,
+      ]
+      \addplot[fill=stdcol, draw=none, bar shift=4.2pt]
+        coordinates {(0.99,C_k) (0.97,t) (1.00,r) (0.98,q_k) (1.00,mixed)};
+      \addlegendentry{mean over 50 instances}
+      \addplot[fill=stdlight, draw=none, bar shift=-4.2pt]
+        coordinates {(0.94,C_k) (0.69,t) (0.99,r) (0.71,q_k) (0.97,mixed)};
+      \addlegendentry{lowest value (instance)}
+      % Lattice-DQN reference: 1.00 everywhere, by construction
+      \draw[latcol, line width=1.6pt] (axis cs:1,{[normalized]-0.6}) -- (axis cs:1,{[normalized]4.6});
+      \node[anchor=south, font=\scriptsize] at (axis cs:1,{[normalized]4.6}) {Lattice-DQN: 1.00};
+      % value column, aligned with the two bars of each row
+      \foreach \ax/\m/\lo in {C_k/0.99/{0.94 (WC02)}, t/0.97/{0.69 (SB08)}, r/1.00/{0.99 (SB07)},
+                            q_k/0.98/{0.71 (SC01)}, mixed/1.00/{0.97 (WC04)}}{
+        \edef\temp{\noexpand\node[anchor=west, font=\noexpand\scriptsize, yshift=4.2pt] at (axis cs:1.03,\ax) {\m};
+                   \noexpand\node[anchor=west, font=\noexpand\scriptsize, yshift=-4.2pt] at (axis cs:1.03,\ax) {\lo};}\temp}
+    \end{axis}
+  \end{tikzpicture}}
+
+%------------------------------------------------------------------------------
+%  Agent-coloured blocks (versions 2 and 3)
+%------------------------------------------------------------------------------
+\newenvironment{stdblock}[1]{%
+  \setbeamercolor{block title}{bg=stdcol, fg=white}%
+  \setbeamercolor{block body}{bg=stdcol!8, fg=black}%
+  \begin{block}{#1}}{\end{block}}
+\newenvironment{latblock}[1]{%
+  \setbeamercolor{block title}{bg=latcol, fg=white}%
+  \setbeamercolor{block body}{bg=latcol!8, fg=black}%
+  \begin{block}{#1}}{\end{block}}
+
+%------------------------------------------------------------------------------
+%  Duel helpers (version 3)
+%------------------------------------------------------------------------------
+\newcommand{\RoundResult}[2]{% #1 colour, #2 text
+  \tikz[baseline=(b.base)]\node[rounded corners=3pt, fill=#1, text=white, font=\small\bfseries, inner sep=4pt] (b) {#2};}
+\newcommand{\WinStd}{\RoundResult{stdcol}{Winner: Standard-DQN}}
+\newcommand{\WinLat}{\RoundResult{latcol}{Winner: Lattice-DQN}}
+\newcommand{\Draw}{\RoundResult{gray!70}{Draw}}
+
+\endinput
