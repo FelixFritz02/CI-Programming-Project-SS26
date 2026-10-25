@@ -211,20 +211,76 @@
 \end{frame}
 
 \begin{frame}{Monotonicity test}
-  Is enforcing even necessary? First, we need to \textbf{measure} monotonicity.
+  How well does $Q$ already respect these relations? For a state $s$ visited during a random
+  rollout, build $s'$ per axis and compare:
 
-  \begin{enumerate}
-    \item Play episodes with random valid actions and collect the visited states.
-    \item For every state $s$, build an \emph{improved} twin $s'$ per component:
-      \[
-        C' > C, \qquad t' = t-1, \qquad r' = 2r, \qquad q' = q/2,
-      \]
-      plus a \emph{mixed} twin with all four improvements at once.
-    \item Compare the $Q$-values of $s$ and $s'$ for every valid action.
-  \end{enumerate}
+  \smallskip
+  \centering
+  \begin{tikzpicture}[
+      font=\small,
+      cellbase/.style={draw, minimum width=7.2mm, minimum height=5.6mm, font=\tiny,
+        inner sep=0pt, align=center, rounded corners=1pt},
+      dim/.style ={cellbase, fill=gray!6,   draw=gray!45, text=gray!55},
+      hlT/.style ={cellbase, fill=gray!18,  draw=alertred, line width=0.9pt},
+      hlC/.style ={cellbase, fill=blue!12,  draw=alertred, line width=0.9pt},
+      hlR/.style ={cellbase, fill=tugreen!18, draw=alertred, line width=0.9pt},
+      hlQ/.style ={cellbase, fill=orange!28, draw=alertred, line width=0.9pt},
+      tag/.style ={anchor=east, font=\scriptsize},
+      >={Latex[length=1.8mm]}
+    ]
+    % ---------- row s: the sampled state ----------
+    \node[cellbase, fill=gray!15]    (s0) at (0,0)    {$t$};
+    \node[cellbase, fill=blue!10]    (s1) at (0.75,0) {$C_k$};
+    \node[cellbase, fill=tugreen!15] (s2) at (1.5,0)  {$r$};
+    \node[cellbase, fill=orange!25]  (s3) at (2.25,0) {$q_k$};
+    \node[tag] at (-1.0,0) {$s=$};
+    \draw[->] (1.1,-0.30) -- (1.1,-0.58);
 
-  \begin{block}{Monotonicity score (one per component)}
-    Share of pairs for which the expected relation holds. $1.00$ = perfectly monotone.
+    % ---------- twin: t ----------
+    \node[hlT] at (0,-0.85)    {$t\!-\!1$};
+    \node[dim] at (0.75,-0.85) {$C_k$};
+    \node[dim] at (1.5,-0.85)  {$r$};
+    \node[dim] at (2.25,-0.85) {$q_k$};
+    \node[tag] at (-1.0,-0.85) {$t$};
+
+    % ---------- twin: C_k ----------
+    \node[dim] at (0,-1.63)    {$t$};
+    \node[hlC] at (0.75,-1.63) {$C'\!>\!C$};
+    \node[dim] at (1.5,-1.63)  {$r$};
+    \node[dim] at (2.25,-1.63) {$q_k$};
+    \node[tag] at (-1.0,-1.63) {$C_k$};
+
+    % ---------- twin: r ----------
+    \node[dim] at (0,-2.41)    {$t$};
+    \node[dim] at (0.75,-2.41) {$C_k$};
+    \node[hlR] at (1.5,-2.41)  {$2r$};
+    \node[dim] at (2.25,-2.41) {$q_k$};
+    \node[tag] at (-1.0,-2.41) {$r$};
+
+    % ---------- twin: q_k ----------
+    \node[dim] at (0,-3.19)    {$t$};
+    \node[dim] at (0.75,-3.19) {$C_k$};
+    \node[dim] at (1.5,-3.19)  {$r$};
+    \node[hlQ] at (2.25,-3.19) {$q/2$};
+    \node[tag] at (-1.0,-3.19) {$q_k$};
+
+    % ---------- twin: mixed ----------
+    \node[hlT] at (0,-4.05)    {$t\!-\!1$};
+    \node[hlC] at (0.75,-4.05) {$C'\!>\!C$};
+    \node[hlR] at (1.5,-4.05)  {$2r$};
+    \node[hlQ] at (2.25,-4.05) {$q/2$};
+    \node[tag] at (-1.0,-4.05) {mixed};
+
+    % ---------- comparison ----------
+    \draw[->, thick] (3.0,-2.41) -- (4.3,-2.41);
+    \node[anchor=west, align=left] at (4.4,-2.41)
+      {$Q(s,a)$ vs.\ $Q(s',a)$\\ for every valid $a$};
+  \end{tikzpicture}
+
+  \smallskip
+  \begin{block}{Monotonicity score}
+    \small Share of (state, action) pairs for which the expected inequality holds.
+    $1.00$ = perfectly monotone.
   \end{block}
 \end{frame}
 
@@ -402,7 +458,7 @@
       \begin{block}{Protocol}
         \begin{itemize}
           \item Same training scheme for both agents
-          \item \color{red}{$10\,000$} training episodes
+          \item $10\,000$ training episodes
           \item Evaluation: frozen weights, no exploration, $10\,000$ episodes
           \item Monotonicity test: $10\,000$ pairs per component
         \end{itemize}
@@ -429,7 +485,7 @@
   \end{figure}
 \end{frame}
 
-\begin{frame}{Reward: how close to the optimum?}
+\begin{frame}{Reward related to complexity}
   \begin{columns}[c]
     \column{0.5\textwidth}
       \centering
