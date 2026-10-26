@@ -522,7 +522,7 @@
   \Source{Mean and minimum over all 50 instances, computed from the report's result tables.}
 \end{frame}
 
-\begin{frame}{The price of the guarantee}
+\begin{frame}{Sample efficiency}
   \begin{columns}[T]
     \column{0.5\textwidth}
       \centering
@@ -539,7 +539,7 @@
     \item \textbf{Sample efficiency:} both agents reach a stable level after about $4\,000$ episodes;
       the Lattice-DQN is slightly more unstable at the start.
     \item \textbf{Training time:} the Lattice-DQN trains $5$--$12\times$ slower
-      \textcolor{red}{(monotonicity enforcement after every step , many small lattice evaluations)}.
+      (monotonicity enforcement after every step , many small lattice evaluations).
     \item \textbf{Tuning:} the Lattice-DQN needs considerably more hyperparameter fine-tuning;
       the Standard-DQN is robust.
   \end{itemize}
